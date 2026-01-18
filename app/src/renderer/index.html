@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>YTMamp</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="container">
+        <div id="top-region">
+            <span>YTMAMP</span>
+            <div id="status-group" style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+                <div id="vol-status" style="font-size: 8px; color: #555;">VOL: --</div>
+                <div id="status-led" title="Offline"></div>
+                <div id="close-btn" title="Close">X</div>
+            </div>
+        </div>
+
+        <div id="main-content">
+            <div id="left-panel">
+                <canvas id="osc" width="140" height="40"></canvas>
+            </div>
+            <div id="right-panel">
+                <div id="info-container">
+                    <div id="title">YTMamp</div>
+                    <div id="artist">Waiting for tab...</div>
+                </div>
+                <div id="timer-container">
+                    <div id="timer">00:00 / 00:00</div>
+                </div>
+                <div id="progress-container">
+                    <div id="progress-track"></div>
+                    <div id="progress-fill"></div>
+                    <input type="range" id="progress-bar" min="0" max="100" value="0">
+                </div>
+            </div>
+        </div>
+
+        <div id="bottom-bar">
+            <div id="controls">
+                <button id="prev-btn">Prev</button>
+                <button id="play-pause-btn">P/P</button>
+                <button id="next-btn">Next</button>
+            </div>
+            <div id="volume-container">
+                <span style="font-size: 8px;">VOL</span>
+                <input type="range" id="volume-slider" min="0" max="100" value="50">
+            </div>
+        </div>
+        <div id="debug-info"></div>
+    </div>
+    <script src="renderer.js"></script>
+</body>
+
+</html>

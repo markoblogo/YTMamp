@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div id="container">
+        <div id="title-bar">
+            <div id="status-group">
+                <div id="status-led"></div>
+                <img src="../icons/icon32.png"
+                    style="width: 14px; height: 14px; margin-right: 4px; border: 1px solid #444; vertical-align: middle;">
+                <span id="header-title">YTMAMP</span>
+            </div>
+        </div>
+
+        <div id="main-content">
+            <div id="status-panel">
+                <div id="status-status">OFFLINE</div>
+                <div id="hint-box">
+                    <p id="hint-main">App not running</p>
+                    <p id="hint-sub">Start the app (menu bar icon)</p>
+                </div>
+            </div>
+
+            <div id="action-buttons">
+                <button id="btn-ytm" class="wa-button">OPEN YTM</button>
+                <button id="btn-show" class="wa-button" disabled>SHOW PLAYER</button>
+            </div>
+
+            <div id="connect-area">
+                <button id="btn-connect" class="wa-button">CONNECT</button>
+                <button id="btn-disconnect" class="wa-button" style="display: none;">DISCONNECT</button>
+            </div>
+
+            <div id="help-area">
+                <button id="btn-install" class="wa-button">HOW TO INSTALL</button>
+            </div>
+
+            <div id="settings-area">
+                <label class="wa-checkbox">
+                    <input type="checkbox" id="check-auto">
+                    <span>Auto-connect</span>
+                </label>
+                <label class="wa-checkbox">
+                    <input type="checkbox" id="check-autoshow">
+                    <span>Auto-show player</span>
+                </label>
+            </div>
+
+            <div id="info-note">
+                <p>Extension controls YTM, but the desktop app must be running (it lives in the menu bar).</p>
+                <p>Auto-connect only connects automatically; it does not start the app.</p>
+            </div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>

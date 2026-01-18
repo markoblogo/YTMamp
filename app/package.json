@@ -1,0 +1,63 @@
+{
+  "name": "ytmamp",
+  "version": "0.1.0",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean",
+    "dist": "npm run clean && electron-builder --mac"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^25.3.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.antonbiletskiy.ytmamp",
+    "productName": "YTMamp",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.music",
+      "icon": "assets/icon.png",
+      "artifactName": "YTMamp-${version}-mac.${ext}"
+    },
+    "dmg": {
+      "title": "Install YTMamp",
+      "icon": "assets/icon.png",
+      "contents": [
+        {
+          "x": 130,
+          "y": 150,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "files": [
+      "src/**/*",
+      "renderer/**/*",
+      "package.json",
+      "assets/**/*"
+    ],
+    "asar": true
+  }
+}

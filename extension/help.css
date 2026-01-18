@@ -1,0 +1,112 @@
+@font-face {
+    font-family: 'YTMamp';
+    src: local('Courier New'), local('Courier'), monospace;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #060606;
+    font-family: 'Verdana', sans-serif;
+    font-size: 14px;
+    color: #bbb;
+    line-height: 1.6;
+}
+
+#container {
+    max-width: 600px;
+    margin: 40px auto;
+    background: #000;
+    border: 1px solid #222;
+    padding: 0;
+}
+
+#title-bar {
+    background: #1a1a1a;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    color: #666;
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #222;
+    text-transform: uppercase;
+}
+
+#content {
+    padding: 40px;
+}
+
+h1 {
+    font-family: 'YTMamp', 'Courier New', monospace;
+    font-size: 24px;
+    color: #00ff00;
+    margin-top: 0;
+    margin-bottom: 20px;
+    letter-spacing: -0.5px;
+}
+
+h2 {
+    font-family: 'YTMamp', 'Courier New', monospace;
+    font-size: 16px;
+    color: #00aa00;
+    margin-top: 30px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+section {
+    margin-bottom: 30px;
+}
+
+p {
+    margin: 0 0 15px;
+}
+
+ul {
+    padding-left: 20px;
+    margin-bottom: 20px;
+}
+
+li {
+    margin-bottom: 10px;
+}
+
+strong {
+    color: #00ff00;
+}
+
+.wa-button {
+    display: inline-flex;
+    height: 32px;
+    padding: 0 20px;
+    background: linear-gradient(180deg, #333 0%, #111 100%);
+    border: 1px solid #444;
+    color: #aaa;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 2px;
+    text-transform: uppercase;
+    text-decoration: none;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, color 0.2s;
+    margin-top: 10px;
+}
+
+.wa-button:hover {
+    border-color: #00ff00;
+    color: #fff;
+}
+
+#footer {
+    border-top: 1px solid #111;
+    margin-top: 40px;
+    padding: 20px 40px;
+    text-align: right;
+    font-size: 10px;
+    color: #444;
+}
