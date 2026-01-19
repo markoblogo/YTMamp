@@ -9,6 +9,10 @@
   <img src="docs/hero.png" alt="YTMamp" width="900" />
 </p>
 
+## Demo
+
+[![YTMamp demo video](https://img.youtube.com/vi/fHRDm8e2n-U/maxresdefault.jpg)](https://youtu.be/fHRDm8e2n-U)
+
 ### Download
 Get the latest macOS installer from **Releases** (DMG).
 
