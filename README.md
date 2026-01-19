@@ -2,6 +2,9 @@
 
 **YTMamp** is a lightweight, retro-inspired mini-player for YouTube Music on macOS. It pairs a high-performance Electron desktop application with a specialized browser extension to give you seamless control over your music without ever leaving your workflow.
 
+### Download
+Get the latest macOS installer from **Releases** (DMG).
+
 > [!NOTE]
 > YTMamp is an independent open-source project and is not affiliated with Google or YouTube.
 
@@ -26,12 +29,13 @@
 
 ### 🧩 Browser Extension Setup
 Currently, the extension is installed in "Unpacked" mode:
-1. Open Chrome (or any Chromium browser like Brave/Edge/Atlas).
+1. Open Chrome (or any Chromium browser like Brave/Edge/Atlas/Comet/etc.).
 2. Navigate to `chrome://extensions`.
 3. Enable **Developer mode** in the top right.
 4. Click **Load unpacked** and select the `extension/` folder from this directory.
 5. **Pin it**: Click the puzzle icon in your toolbar and pin YTMamp for quick access.
 
+Extensions are installed per browser/profile. If you use Comet and Chrome, install it in both if needed
 ---
 
 ## 🚀 Getting Started Checklist
