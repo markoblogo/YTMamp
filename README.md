@@ -5,12 +5,7 @@
 
 **YTMamp** is a lightweight, retro-inspired mini-player for YouTube Music on macOS. It pairs a high-performance Electron desktop application with a specialized browser extension to give you seamless control over your music without ever leaving your workflow.
 
-<p align="center">
-  <img src="docs/hero.png" alt="YTMamp" width="900" />
-</p>
-
 ## Demo
-
 [![YTMamp demo video](https://img.youtube.com/vi/fHRDm8e2n-U/maxresdefault.jpg)](https://youtu.be/fHRDm8e2n-U)
 
 ### Download
