@@ -1,4 +1,7 @@
 # YTMamp
+[![Release](https://img.shields.io/github/v/release/markoblogo/YTMamp?display_name=tag&sort=semver)](https://github.com/markoblogo/YTMamp/releases/latest)
+[![Build](https://github.com/markoblogo/YTMamp/actions/workflows/release.yml/badge.svg)](https://github.com/markoblogo/YTMamp/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/markoblogo/YTMamp)](LICENSE)
 
 **YTMamp** is a lightweight, retro-inspired mini-player for YouTube Music on macOS. It pairs a high-performance Electron desktop application with a specialized browser extension to give you seamless control over your music without ever leaving your workflow.
 
