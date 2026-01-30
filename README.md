@@ -27,7 +27,7 @@ Get the latest macOS installer from **Releases** (DMG).
 
 ## 🛠 Installation (Recommended)
 
-1. **Download the latest DMG** from the [GitHub Releases](https://github.com/your-username/YTMamp/releases).
+1. **Download the latest DMG** from the [GitHub Releases](https://github.com/markoblogo/YTMamp/releases).
 2. **Install**: Open the `.dmg` and drag **YTMamp** to your `Applications` folder.
 > [!IMPORTANT]
 > The DMG is an installer. Once installed, launch YTMamp from your **Applications** folder, not from the mounted disk image.
