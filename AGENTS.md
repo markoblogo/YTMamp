@@ -206,7 +206,7 @@ State:
 - (no commands configured)
 
 - **Run a single test:** (not specified)
-- **Where configs live:** (not specified)
+- **Where configs live:** `.github/workflows/`
 <!-- AGENTSGEN:END section=commands -->
 
 <!-- AGENTSGEN:START section=node -->
@@ -226,7 +226,8 @@ State:
 ## Repo Structure
 
 <!-- AGENTSGEN:START section=structure -->
-- (not specified)
+- **Source:** `app`
+- **Config:** `.github/workflows/`
 <!-- AGENTSGEN:END section=structure -->
 
 ## Output Protocol

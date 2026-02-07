@@ -27,7 +27,13 @@
       "README.md",
       "CONTRIBUTING.md"
     ],
-    "ci": ".github/workflows/"
+    "ci": ".github/workflows/",
+    "source_dirs": [
+      "app"
+    ],
+    "config_locations": [
+      ".github/workflows/"
+    ]
   },
   "commands": {},
   "evidence": {
