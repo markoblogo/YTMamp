@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "mode": "safe",
+  "on_missing_markers": "write_generated",
+  "generated_suffix": ".generated",
+  "markers": {
+    "start": "<!-- AGENTSGEN:START section={section} -->",
+    "end": "<!-- AGENTSGEN:END section={section} -->"
+  },
+  "sections": [
+    "guardrails",
+    "workflow",
+    "style",
+    "verification",
+    "stack",
+    "repo_context"
+  ],
+  "presets": {},
+  "defaults": {},
+  "project": {
+    "primary_stack": "node",
+    "name": "YTMamp",
+    "repo_root": "."
+  },
+  "paths": {
+    "docs": [
+      "README.md",
+      "CONTRIBUTING.md"
+    ],
+    "ci": ".github/workflows/"
+  },
+  "commands": {},
+  "evidence": {
+    "python": [],
+    "node": [
+      "app/package.json"
+    ],
+    "make": [],
+    "ci": [
+      ".github/workflows/release.yml"
+    ]
+  }
+}
