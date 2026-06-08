@@ -79,6 +79,9 @@ npm run dist
 ### Protocol
 The local app/extension bridge is documented in [docs/protocol.md](docs/protocol.md).
 
+### Release QA
+Release smoke testing is tracked in [docs/smoke-test.md](docs/smoke-test.md).
+
 ### Build Releases Locally
 To generate the `.dmg` and `.zip` artifacts on your own machine:
 ```bash
