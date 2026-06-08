@@ -212,8 +212,8 @@ body {
     border-top: 1px solid #333;
     display: flex;
     align-items: center;
-    padding: 0 10px;
-    gap: 10px;
+    padding: 0 6px;
+    gap: 6px;
     -webkit-app-region: no-drag;
     position: relative;
     z-index: 100;
@@ -268,21 +268,27 @@ body {
 
 #controls {
     display: flex;
-    gap: 3px;
+    gap: 2px;
 }
 
 button {
     background: linear-gradient(180deg, #444 0%, #222 100%);
     border: 1px solid #555;
     color: #ccc;
-    padding: 2px 6px;
+    padding: 2px 5px;
     font-size: 9px;
     cursor: pointer;
     border-radius: 2px;
     text-transform: uppercase;
-    min-width: 40px;
+    min-width: 34px;
     -webkit-app-region: no-drag;
     pointer-events: auto;
+}
+
+button.mini-btn {
+    min-width: 28px;
+    padding: 2px 3px;
+    font-size: 8px;
 }
 
 button:hover {

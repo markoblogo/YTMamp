@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-06-08
+### Added
+- Like, dislike, shuffle, and repeat command support.
+- Window position persistence across app sessions.
+- WebSocket protocol validation and track metadata normalization.
+- Unit and integration tests plus CI checks for lint/test on pushes and pull requests.
+
+### Changed
+- Reworked renderer-to-extension command relay to use one global IPC listener.
+- Replaced tight playback polling with media-element events and a slower fallback loop.
+- Reduced waveform payload frequency and bin count for lower content-script overhead.
+- Updated tray menu refresh to reuse the existing system tray instance.
+
+### Fixed
+- Prevented stale IPC listeners after broken WebSocket connections.
+- Added disconnected tab state so the app does not keep showing stale track data.
+
 ## [0.1.0] - 2026-01-19
 ### Added
 - Initial public release of YTMamp.

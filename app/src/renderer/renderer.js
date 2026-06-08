@@ -33,10 +33,18 @@ window.electronAPI.onStatusChange((status) => {
         led.title = 'Connected';
     } else if (statusUpper.includes('NEED') || statusUpper.includes('WAITING')) {
         led.classList.add('waiting');
-        led.title = 'Reconnecting / Need Tab';
+        led.title = statusUpper.includes('NEED') ? 'No YouTube Music tab' : 'Reconnecting / Need Tab';
+        if (statusUpper.includes('NEED')) {
+            document.getElementById('title').innerText = 'YTMamp';
+            document.getElementById('artist').innerText = 'No YouTube Music tab';
+            document.getElementById('timer').innerText = '--:-- / --:--';
+            document.getElementById('progress-bar').value = 0;
+            document.getElementById('progress-fill').style.width = '0%';
+        }
     } else {
         led.classList.add('offline');
         led.title = 'Offline';
+        document.getElementById('artist').innerText = 'Disconnected';
     }
 });
 
@@ -179,6 +187,18 @@ document.getElementById('play-pause-btn').onclick = () => {
 document.getElementById('next-btn').onclick = () => {
     console.log('[DEBUG] CLICK next');
     sendCommand('cmd', 'next');
+};
+document.getElementById('like-btn').onclick = () => {
+    console.log('[DEBUG] CLICK like');
+    sendCommand('cmd', 'like');
+};
+document.getElementById('shuffle-btn').onclick = () => {
+    console.log('[DEBUG] CLICK shuffle');
+    sendCommand('cmd', 'shuffle');
+};
+document.getElementById('repeat-btn').onclick = () => {
+    console.log('[DEBUG] CLICK repeat');
+    sendCommand('cmd', 'repeat');
 };
 
 // --- Progress Bar ---

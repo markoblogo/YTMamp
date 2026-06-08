@@ -1,18 +1,19 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { WebSocketServer } = require('ws');
+const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 
 let mainWindow;
 let tray;
-let wss;
+let bridge;
 let isQuitting = false;
 
 // --- Settings Persistence ---
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings = {
     startAtLogin: false,
-    autoShowOnPlay: true
+    autoShowOnPlay: true,
+    windowBounds: null
 };
 
 function loadSettings() {
@@ -45,31 +46,43 @@ function applyAutostart() {
 }
 
 function broadcastSettings() {
-    if (!wss) return;
-    const msg = JSON.stringify({ type: 'settings', v: 1, settings });
-    wss.clients.forEach(client => {
-        if (client.readyState === 1) { // 1 = OPEN
-            client.send(msg);
-        }
-    });
+    if (!bridge) return;
+    bridge.broadcast({ type: 'settings', v: 1, settings });
 }
 
 function broadcastVisibility() {
-    if (!wss || !mainWindow) return;
-    const msg = JSON.stringify({
+    if (!bridge || !mainWindow) return;
+    bridge.broadcast({
         type: 'app',
         v: 1,
         windowVisible: mainWindow.isVisible()
     });
-    wss.clients.forEach(client => {
-        if (client.readyState === 1) {
-            client.send(msg);
-        }
+}
+
+function boundsAreVisible(bounds) {
+    if (!bounds || typeof bounds.x !== 'number' || typeof bounds.y !== 'number') return false;
+    const displays = screen.getAllDisplays();
+    return displays.some((display) => {
+        const area = display.workArea;
+        return bounds.x >= area.x - 40 &&
+            bounds.y >= area.y - 40 &&
+            bounds.x <= area.x + area.width - 80 &&
+            bounds.y <= area.y + area.height - 40;
     });
 }
 
+function saveWindowBounds() {
+    if (!mainWindow) return;
+    const bounds = mainWindow.getBounds();
+    settings.windowBounds = { x: bounds.x, y: bounds.y };
+    saveSettings();
+}
+
 function createWindow() {
+    const savedBounds = boundsAreVisible(settings.windowBounds) ? settings.windowBounds : {};
     mainWindow = new BrowserWindow({
+        x: savedBounds.x,
+        y: savedBounds.y,
         width: 360,
         height: 116,
         useContentSize: true,
@@ -102,12 +115,54 @@ function createWindow() {
         broadcastVisibility();
     });
 
+    mainWindow.on('moved', saveWindowBounds);
+    mainWindow.on('move', saveWindowBounds);
+
     mainWindow.on('close', (event) => {
+        saveWindowBounds();
         if (!isQuitting) {
             event.preventDefault();
             mainWindow.hide();
         }
     });
+}
+
+function updateTrayMenu() {
+    if (!tray) return;
+    const contextMenu = Menu.buildFromTemplate([
+        { label: 'YTMamp', enabled: false },
+        { type: 'separator' },
+        { label: 'Show/Hide', click: () => toggleWindow() },
+        {
+            label: 'Start at login',
+            type: 'checkbox',
+            checked: settings.startAtLogin,
+            click: (item) => {
+                settings.startAtLogin = item.checked;
+                saveSettings();
+                applyAutostart();
+                updateTrayMenu();
+            }
+        },
+        {
+            label: 'Auto-show on play',
+            type: 'checkbox',
+            checked: settings.autoShowOnPlay,
+            click: (item) => {
+                settings.autoShowOnPlay = item.checked;
+                saveSettings();
+                updateTrayMenu();
+            }
+        },
+        { type: 'separator' },
+        {
+            label: 'Quit', click: () => {
+                isQuitting = true;
+                app.quit();
+            }
+        }
+    ]);
+    tray.setContextMenu(contextMenu);
 }
 
 function createTray() {
@@ -120,41 +175,6 @@ function createTray() {
     }
 
     tray = new Tray(icon);
-
-    const updateTrayMenu = () => {
-        const contextMenu = Menu.buildFromTemplate([
-            { label: 'YTMamp', enabled: false },
-            { type: 'separator' },
-            { label: 'Show/Hide', click: () => toggleWindow() },
-            {
-                label: 'Start at login',
-                type: 'checkbox',
-                checked: settings.startAtLogin,
-                click: (item) => {
-                    settings.startAtLogin = item.checked;
-                    saveSettings();
-                    applyAutostart();
-                }
-            },
-            {
-                label: 'Auto-show on play',
-                type: 'checkbox',
-                checked: settings.autoShowOnPlay,
-                click: (item) => {
-                    settings.autoShowOnPlay = item.checked;
-                    saveSettings();
-                }
-            },
-            { type: 'separator' },
-            {
-                label: 'Quit', click: () => {
-                    isQuitting = true;
-                    app.quit();
-                }
-            }
-        ]);
-        tray.setContextMenu(contextMenu);
-    };
 
     tray.setToolTip('YTMamp');
     updateTrayMenu();
@@ -173,91 +193,77 @@ function toggleWindow() {
 }
 
 function setupWebSocket() {
-    wss = new WebSocketServer({ port: 18765, host: '127.0.0.1' });
-    console.log('[WS] Server started on ws://127.0.0.1:18765');
-
-    wss.on('connection', (ws, req) => {
-        const clientIp = req.socket.remoteAddress;
-        console.log(`[WS] Client connected from ${clientIp}`);
-
-        // Send current settings and visibility on connection
-        ws.send(JSON.stringify({ type: 'settings', v: 1, settings }));
-        if (mainWindow) {
-            ws.send(JSON.stringify({
-                type: 'app',
-                v: 1,
-                windowVisible: mainWindow.isVisible()
-            }));
-        }
-
-        ws.on('message', (data) => {
-            try {
-                const message = JSON.parse(data);
-                if (message.v !== 1) return;
-
-                if (message.type === 'ping') {
-                    ws.send(JSON.stringify({ type: 'pong', v: 1 }));
-                } else if (message.type === 'cmd' && message.cmd === 'showWindow') {
-                    if (mainWindow) {
-                        mainWindow.show();
-                        mainWindow.setAlwaysOnTop(true);
-                        mainWindow.focus();
-                    }
-                } else if (message.type === 'cmd' && message.cmd === 'hideWindow') {
-                    if (mainWindow) {
-                        mainWindow.hide();
-                    }
-                } else if (message.type === 'event' && message.name === 'playingStarted') {
-                    console.log('[Main] Received playingStarted event');
-                    if (settings.autoShowOnPlay && mainWindow && !mainWindow.isVisible()) {
-                        console.log('[Main] Auto-showing window due to playback');
-                        mainWindow.show();
-                    }
-                } else if (message.type === 'set-setting') {
-                    if (message.key in settings) {
-                        settings[message.key] = message.value;
-                        saveSettings();
-                        console.log(`[Main] Setting updated: ${message.key} = ${message.value}`);
-                        // Broadcast updated settings to ALL clients
-                        broadcastSettings();
-                        // Update tray menu to reflect changes if needed
-                        if (message.key === 'autoShowOnPlay' || message.key === 'startAtLogin') {
-                            createTray(); // Refresh menu
-                        }
-                    }
-                } else if (message.type === 'get-settings') {
-                    ws.send(JSON.stringify({ type: 'settings', v: 1, settings }));
-                } else if (message.type === 'status') {
-                    if (mainWindow) mainWindow.webContents.send('status-change', message.msg);
-                } else if (message.type === 'track') {
-                    if (mainWindow) mainWindow.webContents.send('track-update', message);
-                } else if (message.type === 'volStatus') {
-                    if (mainWindow) {
-                        mainWindow.webContents.send('vol-status', message.status);
-                    }
-                } else if (message.type === 'state') {
-                    if (mainWindow) mainWindow.webContents.send('state-update', message);
-                } else if ((message.type === 'wave' || message.type === 'waveFallback')) {
-                    if (mainWindow) mainWindow.webContents.send('wave-update', message);
+    bridge = createBridgeServer({
+        port: 18765,
+        host: '127.0.0.1',
+        onStatus: (status) => {
+            if (status === 'listening') console.log('[WS] Server started on ws://127.0.0.1:18765');
+        },
+        onConnection: (ws, req) => {
+            const clientIp = req.socket.remoteAddress;
+            console.log(`[WS] Client connected from ${clientIp}`);
+            ws.send(JSON.stringify({ type: 'settings', v: 1, settings }));
+            if (mainWindow) {
+                ws.send(JSON.stringify({
+                    type: 'app',
+                    v: 1,
+                    windowVisible: mainWindow.isVisible()
+                }));
+            }
+        },
+        onMessage: (message, ws) => {
+            if (message.type === 'ping') {
+                ws.send(JSON.stringify({ type: 'pong', v: 1 }));
+            } else if (message.type === 'cmd' && message.cmd === 'showWindow') {
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.setAlwaysOnTop(true);
+                    mainWindow.focus();
                 }
-            } catch (e) {
-                console.error('[WS] Failed to parse message:', data.toString());
+            } else if (message.type === 'cmd' && message.cmd === 'hideWindow') {
+                if (mainWindow) mainWindow.hide();
+            } else if (message.type === 'event' && message.name === 'playingStarted') {
+                console.log('[Main] Received playingStarted event');
+                if (settings.autoShowOnPlay && mainWindow && !mainWindow.isVisible()) {
+                    console.log('[Main] Auto-showing window due to playback');
+                    mainWindow.show();
+                }
+            } else if (message.type === 'set-setting') {
+                settings[message.key] = message.value;
+                saveSettings();
+                console.log(`[Main] Setting updated: ${message.key} = ${message.value}`);
+                broadcastSettings();
+                updateTrayMenu();
+            } else if (message.type === 'get-settings') {
+                ws.send(JSON.stringify({ type: 'settings', v: 1, settings }));
+            } else if (message.type === 'status') {
+                if (mainWindow) mainWindow.webContents.send('status-change', message.msg);
+            } else if (message.type === 'track') {
+                if (mainWindow) mainWindow.webContents.send('track-update', sanitizeTrackMessage(message));
+            } else if (message.type === 'volStatus') {
+                if (mainWindow) mainWindow.webContents.send('vol-status', message.status);
+            } else if (message.type === 'state') {
+                if (mainWindow) mainWindow.webContents.send('state-update', message);
+            } else if ((message.type === 'wave' || message.type === 'waveFallback')) {
+                if (mainWindow) mainWindow.webContents.send('wave-update', message);
             }
-        });
+        },
+        onError: (error) => console.error('[WS] Error:', error.message)
+    });
+    bridge.start();
+}
 
-        const cmdHandler = (event, command) => {
-            if (ws.readyState === ws.OPEN) {
-                console.log(`[Main] [ID:${command.id || 'N/A'}] Relaying CMD to WS: ${command.cmd}`);
-                ws.send(JSON.stringify(command));
-            } else {
-                console.warn(`[Main] [ID:${command.id || 'N/A'}] Drop: WS not open`);
-            }
-        };
-        ipcMain.on('send-command', cmdHandler);
-
-        ws.on('close', () => {
-            ipcMain.removeListener('send-command', cmdHandler);
-        });
+function setupIpc() {
+    ipcMain.on('send-command', (event, command) => {
+        if (!validateMessage(command)) {
+            console.warn('[Main] Dropping invalid renderer command');
+            return;
+        }
+        if (bridge && bridge.relayCommand(command)) {
+            console.log(`[Main] [ID:${command.id || 'N/A'}] Relaying CMD to WS: ${command.cmd}`);
+        } else {
+            console.warn(`[Main] [ID:${command.id || 'N/A'}] Drop: no active WS client`);
+        }
     });
 
     ipcMain.on('quit-app', () => {
@@ -275,6 +281,7 @@ app.whenReady().then(() => {
     applyAutostart();
     createWindow();
     createTray();
+    setupIpc();
     setupWebSocket();
 
     app.on('activate', function () {
@@ -289,4 +296,5 @@ app.on('window-all-closed', function () {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (bridge) bridge.stop();
 });

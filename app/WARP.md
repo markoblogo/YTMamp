@@ -25,7 +25,9 @@ Artifacts will be written to `dist/` using the configuration under the `build` k
 
 ### Tests / linting
 
-There are currently no npm scripts defined for tests or linting in `package.json`. If you add them later (for example `npm test` or `npm run lint`), prefer those project-local scripts over global tools.
+- Syntax check: `npm run lint`
+- Unit/integration tests: `npm test`
+- Combined local check: `npm run check`
 
 ## Architecture overview
 
@@ -67,6 +69,7 @@ Electron is configured via `package.json`:
 - Uses `ipcMain` to listen for commands from the renderer (e.g., `send-command`, `quit-app`, `hide-window`).
 - Relays commands received from the renderer over WebSocket to external clients.
 - Relays events/messages from WebSocket clients to the renderer via `webContents.send` on channels such as `status-change`, `track-update`, `vol-status`, `state-update`, and `wave-update`.
+- The WebSocket bridge lives in `src/main/ws_bridge.js` so protocol validation, command relay, cleanup, and tests do not require launching Electron.
 
 ### WebSocket server / external integration
 
@@ -92,7 +95,7 @@ Message types handled include (non-exhaustive, conceptual view):
   - `state` → `state-update`
   - `wave` / `waveFallback` → `wave-update`
 
-Each WebSocket connection installs an IPC handler (`send-command`) that forwards renderer-originating commands to that specific WebSocket client and cleans it up on `ws.close`.
+One global IPC handler (`send-command`) forwards renderer-originating commands to the active WebSocket client. This avoids leaking per-connection IPC listeners when clients disconnect abnormally.
 
 ### Preload script (`src/main/preload.js`)
 

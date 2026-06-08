@@ -1,6 +1,22 @@
 console.log('[YTMamp] Content script loaded');
 
-// --- Message Listener ---
+const WAVE_SEND_INTERVAL_MS = 100;
+const STATE_FALLBACK_INTERVAL_MS = 2000;
+const WAVE_FFT_SIZE = 128;
+const CONTROL_COMMANDS = new Set(['playPause', 'next', 'prev', 'like', 'dislike', 'shuffle', 'repeat']);
+
+let audioCtx, analyser, gainNode, dataArray, currentSource;
+let sources = new WeakMap();
+let currentMediaEl = null;
+let currentGraphMediaEl = null;
+let mediaCleanup = null;
+let flatDataCounter = 0;
+let isWaveLoopRunning = false;
+let lastWaveSentAt = 0;
+let lastSentVolume = -1;
+let lastPlayingState = false;
+let domObserver = null;
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.v !== 1) return;
 
@@ -8,54 +24,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.type === 'cmd') {
         const cmdId = request.id || 'N/A';
-        switch (request.cmd) {
-            case 'playPause':
-                window.YTM_ADAPTER.playPause(cmdId);
-                break;
-            case 'next':
-                window.YTM_ADAPTER.next(cmdId);
-                break;
-            case 'prev':
-                window.YTM_ADAPTER.prev(cmdId);
-                break;
-            case 'setVolume':
-                const res = setGainVolume(request.value);
-                console.log(`[YTMamp] setVolume [ID:${request.id}] result: ${res}`);
-                chrome.runtime.sendMessage({ type: 'volStatus', v: 1, status: res });
-                break;
-            case 'seek':
-                const media = getMediaEl();
-                if (media && request.valueSec !== undefined) {
-                    if (isFinite(request.valueSec)) {
-                        media.currentTime = request.valueSec;
-                        console.log(`[YTMamp] Seek [ID:${request.id}] to: ${request.valueSec}`);
-                    }
-                }
-                break;
-            default:
-                console.log(`[YTMamp] Unknown command: ${request.cmd}`);
+        if (CONTROL_COMMANDS.has(request.cmd)) {
+            window.YTM_ADAPTER[request.cmd](cmdId);
+        } else if (request.cmd === 'setVolume') {
+            const res = setGainVolume(clamp01(request.value));
+            console.log(`[YTMamp] setVolume [ID:${request.id}] result: ${res}`);
+            chrome.runtime.sendMessage({ type: 'volStatus', v: 1, status: res });
+        } else if (request.cmd === 'seek') {
+            const media = getMediaEl();
+            if (media && Number.isFinite(request.valueSec) && request.valueSec >= 0) {
+                media.currentTime = request.valueSec;
+                console.log(`[YTMamp] Seek [ID:${request.id}] to: ${request.valueSec}`);
+            }
+        } else {
+            console.log(`[YTMamp] Unknown command: ${request.cmd}`);
         }
         sendResponse({ ok: true });
     }
 });
 
+function clamp01(value) {
+    return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
 function setGainVolume(value) {
-    // value is 0.0 to 1.0
     if (gainNode) {
         gainNode.gain.setTargetAtTime(value, audioCtx.currentTime, 0.05);
         console.log(`[YTMamp] Gain set to ${value}`);
         return 'ok';
     }
-    // Fallback to adapter's DOM manipulation
     return window.YTM_ADAPTER.setVolume(value);
 }
 
-let lastSentVolume = -1;
+function getMediaEl() {
+    return document.querySelector('video') || document.querySelector('audio');
+}
+
 function reportTrack(info) {
     const rawVolume = window.YTM_ADAPTER.getVolume();
     const volume = Math.round(rawVolume * 100) / 100;
-
-    // Only send volume if it changed significantly (> 0.03) or first time
     const delta = Math.abs(volume - lastSentVolume);
     const shouldSendVolume = lastSentVolume === -1 || delta >= 0.03;
 
@@ -75,43 +82,44 @@ function reportTrack(info) {
     chrome.runtime.sendMessage(msg);
 }
 
-// Watch for changes
-window.YTM_ADAPTER.watchNowPlaying(reportTrack);
+function sendState(media = getMediaEl()) {
+    if (!media) return;
+    const isPlaying = !media.paused;
 
-// --- Playback State Loop ---
-let lastPlayingState = false;
-setInterval(() => {
-    const media = getMediaEl();
-    if (media) {
-        const isPlaying = !media.paused;
-
-        // Detect transition from paused to playing
-        if (isPlaying && !lastPlayingState) {
-            if (audioCtx && audioCtx.state === 'suspended') {
-                audioCtx.resume().then(() => console.log('[YTMamp] AudioContext resumed on play'));
-            }
-            chrome.storage.sync.get({ autoShow: true }, (data) => {
-                if (data.autoShow) {
-                    chrome.runtime.sendMessage({ type: 'event', name: 'playingStarted', v: 1 });
-                }
-            });
+    if (isPlaying && !lastPlayingState) {
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().then(() => console.log('[YTMamp] AudioContext resumed on play'));
         }
-        lastPlayingState = isPlaying;
-
-        chrome.runtime.sendMessage({
-            type: 'state',
-            v: 1,
-            positionSec: media.currentTime,
-            durationSec: media.duration,
-            playing: isPlaying
+        chrome.storage.sync.get({ autoShow: true }, (data) => {
+            if (data.autoShow) {
+                chrome.runtime.sendMessage({ type: 'event', name: 'playingStarted', v: 1 });
+            }
         });
     }
-    // Auto-hide miniplayer periodically
-    hideYtmMiniPlayer();
-}, 500);
+    lastPlayingState = isPlaying;
+
+    chrome.runtime.sendMessage({
+        type: 'state',
+        v: 1,
+        positionSec: Number.isFinite(media.currentTime) ? media.currentTime : 0,
+        durationSec: Number.isFinite(media.duration) ? media.duration : 0,
+        playing: isPlaying
+    });
+}
+
+function bindMediaEvents(media) {
+    if (!media || currentMediaEl === media) return;
+    if (mediaCleanup) mediaCleanup();
+
+    currentMediaEl = media;
+    const events = ['play', 'pause', 'timeupdate', 'durationchange', 'volumechange', 'loadedmetadata'];
+    const handler = () => sendState(media);
+    events.forEach((eventName) => media.addEventListener(eventName, handler, { passive: true }));
+    mediaCleanup = () => events.forEach((eventName) => media.removeEventListener(eventName, handler));
+    sendState(media);
+}
 
 function hideYtmMiniPlayer() {
-    // Selectors for YTM and general YouTube miniplayer close buttons
     const selectors = [
         'ytmusic-player-bar .close-button',
         '.ytp-miniplayer-close-button',
@@ -122,24 +130,13 @@ function hideYtmMiniPlayer() {
 
     for (const selector of selectors) {
         const btn = document.querySelector(selector);
-        if (btn && btn.offsetParent !== null) { // exists and is visible
+        if (btn && btn.offsetParent !== null) {
             console.log(`[YTMamp] miniplayer: detected via "${selector}", closing...`);
             btn.click();
             return true;
         }
     }
     return false;
-}
-
-// --- Waveform Logic ---
-let audioCtx, analyser, gainNode, dataArray, currentSource;
-let sources = new WeakMap(); // mediaElement -> MediaElementSourceNode
-let currentMediaEl = null;
-let flatDataCounter = 0;
-let isWaveLoopRunning = false;
-
-function getMediaEl() {
-    return document.querySelector('video') || document.querySelector('audio');
 }
 
 function setupAudioCapture() {
@@ -150,7 +147,9 @@ function setupAudioCapture() {
         return;
     }
 
-    if (currentMediaEl === media && audioCtx && audioCtx.state !== 'closed') {
+    bindMediaEvents(media);
+
+    if (currentGraphMediaEl === media && audioCtx && audioCtx.state !== 'closed' && currentSource) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         return;
     }
@@ -160,7 +159,6 @@ function setupAudioCapture() {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
 
-        // 1. Disconnect previous graph if exists
         if (currentSource) {
             try { currentSource.disconnect(); } catch (e) { }
         }
@@ -171,12 +169,10 @@ function setupAudioCapture() {
             try { analyser.disconnect(); } catch (e) { }
         }
 
-        // 2. Setup Nodes
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
+        analyser.fftSize = WAVE_FFT_SIZE;
         gainNode = audioCtx.createGain();
 
-        // 3. Get/Create Source
         let source = sources.get(media);
         if (!source) {
             source = audioCtx.createMediaElementSource(media);
@@ -186,13 +182,12 @@ function setupAudioCapture() {
             console.log('[YTMamp] wave: reusing existing source for', media.tagName);
         }
 
-        // 4. Connect Graph
         source.connect(gainNode);
         gainNode.connect(analyser);
         analyser.connect(audioCtx.destination);
 
         currentSource = source;
-        currentMediaEl = media;
+        currentGraphMediaEl = media;
         dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         console.log('[YTMamp] wave: graph connected successfully');
@@ -209,64 +204,80 @@ function setupAudioCapture() {
 }
 
 function startStreamLoop() {
-    requestAnimationFrame(function stream() {
+    requestAnimationFrame(function stream(now) {
         const media = getMediaEl();
 
-        if (!analyser || media !== currentMediaEl) {
-            if (media && media !== currentMediaEl) {
+        if (!analyser || media !== currentGraphMediaEl) {
+            if (media && media !== currentGraphMediaEl) {
                 console.log('[YTMamp] wave: media element changed, re-binding...');
+                currentSource = null;
+                currentGraphMediaEl = null;
                 setupAudioCapture();
             }
             isWaveLoopRunning = false;
             return;
         }
 
-        analyser.getByteTimeDomainData(dataArray);
+        if (now - lastWaveSentAt >= WAVE_SEND_INTERVAL_MS) {
+            lastWaveSentAt = now;
+            analyser.getByteTimeDomainData(dataArray);
 
-        // Silence/Flat detection
-        let isFlat = true;
-        for (let i = 0; i < dataArray.length; i++) {
-            if (Math.abs(dataArray[i] - 128) > 2) {
-                isFlat = false;
-                break;
+            let isFlat = true;
+            for (let i = 0; i < dataArray.length; i++) {
+                if (Math.abs(dataArray[i] - 128) > 2) {
+                    isFlat = false;
+                    break;
+                }
+            }
+
+            if (isFlat) {
+                flatDataCounter++;
+                if (flatDataCounter > 15) {
+                    const reason = (media && media.paused) ? 'Media paused' : 'Silent data';
+                    chrome.runtime.sendMessage({ type: 'waveFallback', v: 1, reason });
+                }
+            } else {
+                flatDataCounter = 0;
+                chrome.runtime.sendMessage({ type: 'wave', v: 1, data: Array.from(dataArray) });
             }
         }
 
-        if (isFlat) {
-            flatDataCounter++;
-            if (flatDataCounter > 30) { // ~1.5s
-                const reason = (media && media.paused) ? 'Media paused' : 'Silent data';
-                chrome.runtime.sendMessage({ type: 'waveFallback', v: 1, reason });
-            }
-        } else {
-            flatDataCounter = 0;
-            const data = Array.from(dataArray).filter((_, i) => i % 2 === 0);
-            chrome.runtime.sendMessage({ type: 'wave', v: 1, data });
-        }
-
-        setTimeout(() => requestAnimationFrame(stream), 50); // ~20fps
+        requestAnimationFrame(stream);
     });
 }
 
-// Watch for DOM changes to detect new media elements
-const domObserver = new MutationObserver(() => {
+function observePlayerDom() {
+    if (domObserver) domObserver.disconnect();
+    const root = document.querySelector('ytmusic-player-bar') || document.querySelector('#player') || document.body;
+    domObserver = new MutationObserver(() => {
+        const media = getMediaEl();
+        if (media && media !== currentMediaEl) {
+            console.log('[YTMamp] wave: new media detected via Observer');
+            currentSource = null;
+            currentGraphMediaEl = null;
+            setupAudioCapture();
+        }
+        hideYtmMiniPlayer();
+    });
+    domObserver.observe(root, { childList: true, subtree: true });
+}
+
+window.YTM_ADAPTER.watchNowPlaying(reportTrack);
+observePlayerDom();
+
+setInterval(() => {
     const media = getMediaEl();
-    if (media && media !== currentMediaEl) {
-        console.log('[YTMamp] wave: new media detected via Observer');
-        setupAudioCapture();
+    if (media) {
+        bindMediaEvents(media);
+        sendState(media);
     }
     hideYtmMiniPlayer();
-});
-domObserver.observe(document.body, { childList: true, subtree: true });
+}, STATE_FALLBACK_INTERVAL_MS);
 
-// Browser interaction to resume context
 ['click', 'mousedown', 'keydown'].forEach(evt => {
     document.addEventListener(evt, () => {
-        if (audioCtx && audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }, { once: false, passive: true });
 });
 
-// Start
 setupAudioCapture();

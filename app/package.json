@@ -1,12 +1,15 @@
 {
   "name": "ytmamp",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "dist": "npm run clean && electron-builder --mac"
+    "dist": "npm run clean && electron-builder --mac",
+    "lint": "node scripts/check-js.js",
+    "test": "node --test",
+    "check": "npm run lint && npm test"
   },
   "dependencies": {
     "ws": "^8.18.0"

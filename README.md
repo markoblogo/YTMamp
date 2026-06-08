@@ -22,6 +22,7 @@ Get the latest macOS installer from **Releases** (DMG).
 - **Retro Aesthetic**: Modern take on classic player designs with neon green accents.
 - **Always on Top**: Keeps your controls accessible while you work.
 - **Waveform Visualizer**: Real-time oscilloscope driven by your music.
+- **Expanded Controls**: Play/pause, previous, next, seek, volume, like, shuffle, and repeat.
 - **Native Experience**: System tray integration, "Start at login" support, and global media keys.
 - **Auto-pilot**: Automatically hides the native YTM mini-player and can auto-show itself on playback.
 
@@ -68,11 +69,15 @@ Extensions are installed per browser/profile. If you use Comet and Chrome, insta
 # Setup the desktop app
 cd app
 npm install
+npm run check
 npm start
 
 # For subsequent builds
 npm run dist
 ```
+
+### Protocol
+The local app/extension bridge is documented in [docs/protocol.md](docs/protocol.md).
 
 ### Build Releases Locally
 To generate the `.dmg` and `.zip` artifacts on your own machine:

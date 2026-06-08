@@ -20,6 +20,8 @@ function checkTabStatus() {
                 socket.send(JSON.stringify({ type: 'status', v: 1, msg: 'Need YTM Tab' }));
                 chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'Need YTM Tab' }).catch(() => { });
             }
+        } else if (tabs.length === 0) {
+            chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'Need YTM Tab' }).catch(() => { });
         }
     });
 }
@@ -101,6 +103,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             checkTabStatus();
         }
     }
+});
+
+chrome.tabs.onRemoved.addListener(() => {
+    checkTabStatus();
 });
 
 let lastAppStatus = { windowVisible: false };

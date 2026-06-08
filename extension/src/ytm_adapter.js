@@ -9,7 +9,11 @@ const YTM_SELECTORS = {
     LABELS: {
         playPause: ['Play', 'Pause', 'воспроизвести', 'пауза', 'jouer'],
         next: ['Next', 'следующий', 'suivant'],
-        prev: ['Previous', 'предыдущий', 'précédent']
+        prev: ['Previous', 'предыдущий', 'précédent'],
+        like: ['Like', 'Нравится', "J'aime"],
+        dislike: ['Dislike', 'Не нравится', "Je n'aime pas"],
+        shuffle: ['Shuffle', 'Перемешать', 'Aléatoire'],
+        repeat: ['Repeat', 'Повтор', 'Répéter']
     }
 };
 
@@ -46,7 +50,11 @@ const YTM_ADAPTER = {
         const selectors = {
             playPause: ['#play-pause-button', '.play-pause-button'],
             next: ['.next-button', 'tp-yt-paper-icon-button.next-button'],
-            prev: ['.previous-button', 'tp-yt-paper-icon-button.previous-button']
+            prev: ['.previous-button', 'tp-yt-paper-icon-button.previous-button'],
+            like: ['tp-yt-paper-icon-button.like', '#button-shape-like', 'button[aria-label*="Like"]'],
+            dislike: ['tp-yt-paper-icon-button.dislike', '#button-shape-dislike', 'button[aria-label*="Dislike"]'],
+            shuffle: ['.shuffle', 'tp-yt-paper-icon-button[title*="Shuffle"]', 'button[aria-label*="Shuffle"]'],
+            repeat: ['.repeat', 'tp-yt-paper-icon-button[title*="Repeat"]', 'button[aria-label*="Repeat"]']
         };
 
         for (const sel of selectors[type]) {
@@ -95,6 +103,10 @@ const YTM_ADAPTER = {
     playPause(cmdId) { return this.control('playPause', cmdId); },
     next(cmdId) { return this.control('next', cmdId); },
     prev(cmdId) { return this.control('prev', cmdId); },
+    like(cmdId) { return this.control('like', cmdId); },
+    dislike(cmdId) { return this.control('dislike', cmdId); },
+    shuffle(cmdId) { return this.control('shuffle', cmdId); },
+    repeat(cmdId) { return this.control('repeat', cmdId); },
 
     getNowPlaying() {
         const root = findPlayerBar();
@@ -158,3 +170,7 @@ const YTM_ADAPTER = {
 };
 
 window.YTM_ADAPTER = YTM_ADAPTER;
+
+if (typeof module !== 'undefined') {
+    module.exports = { YTM_ADAPTER, YTM_SELECTORS, findPlayerBar };
+}
