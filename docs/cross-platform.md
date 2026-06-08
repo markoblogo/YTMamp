@@ -15,6 +15,8 @@ Expected assets for a `v0.3.0` release:
 
 ## Platform smoke checklist
 
+CI verifies install/lint/test and release packaging. Tray behavior, autostart, and browser-extension connectivity still need a real desktop session per OS.
+
 ### macOS
 
 - DMG opens and installs into `/Applications`.

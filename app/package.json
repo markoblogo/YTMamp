@@ -1,6 +1,9 @@
 {
   "name": "ytmamp",
   "version": "0.3.0",
+  "description": "Retro mini-player for YouTube Music with a Chromium extension bridge.",
+  "author": "markoblogo",
+  "license": "MIT",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",

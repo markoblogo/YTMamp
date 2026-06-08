@@ -11,10 +11,14 @@
 [![YTMamp demo video](https://img.youtube.com/vi/fHRDm8e2n-U/maxresdefault.jpg)](https://youtu.be/fHRDm8e2n-U)
 
 ### Download
-Get the latest desktop build from **Releases**:
+Get the latest desktop build from [GitHub Releases](https://github.com/markoblogo/YTMamp/releases/latest):
 - macOS: `YTMamp-*-mac.dmg`
 - Windows: `YTMamp-*-win.exe` or `YTMamp-*-win.zip`
 - Linux: `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb`
+
+Package status:
+- macOS packaging is smoke-tested by the maintainer.
+- Windows and Linux packages are built in CI and should be smoke-tested on real desktops before broad distribution.
 
 > [!NOTE]
 > YTMamp is an independent open-source project and is not affiliated with Google or YouTube.
@@ -85,7 +89,7 @@ Browser support notes: [docs/browser-support.md](docs/browser-support.md).
 ## 🔍 Troubleshooting
 - **"Receiving end does not exist"**: If you just updated the extension, refresh your YouTube Music tab.
 - **No Waveform**: Make sure you've clicked inside the YTM tab at least once since opening it.
-- **Not Connecting**: Ensure the YTMamp desktop app is running (check your menu bar).
+- **Not Connecting**: Ensure the YTMamp desktop app is running and check the tray/menu bar icon.
 
 ---
 
@@ -126,6 +130,8 @@ npm run dist:win    # Windows NSIS installer + ZIP
 npm run dist:linux  # Linux AppImage + DEB
 ```
 Find your builds in `app/dist/`.
+
+Release builds are produced by GitHub Actions on matching runners: macOS, Windows, and Ubuntu.
 
 ---
 
