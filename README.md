@@ -38,13 +38,15 @@ Get the latest macOS installer from **Releases** (DMG).
 
 ### 🧩 Browser Extension Setup
 Currently, the extension is installed in "Unpacked" mode:
-1. Open Chrome (or any Chromium browser like Brave/Edge/Atlas/Comet/etc.).
+1. Open a supported Chromium browser. Tested: **Chrome**, **Comet**, **Atlas**.
 2. Navigate to `chrome://extensions`.
 3. Enable **Developer mode** in the top right.
 4. Click **Load unpacked** and select the `extension/` folder from this directory.
 5. **Pin it**: Click the puzzle icon in your toolbar and pin YTMamp for quick access.
 
-Extensions are installed per browser/profile. If you use Comet and Chrome, install it in both if needed
+Extensions are installed per browser/profile. If you use Comet, Atlas, and Chrome, install it in each browser/profile as needed.
+
+Browser support notes: [docs/browser-support.md](docs/browser-support.md).
 ---
 
 ## 🚀 Getting Started Checklist
@@ -78,6 +80,9 @@ npm run dist
 
 ### Protocol
 The local app/extension bridge is documented in [docs/protocol.md](docs/protocol.md).
+
+### Browser support
+Tested Chromium browsers are documented in [docs/browser-support.md](docs/browser-support.md).
 
 ### Release QA
 Release smoke testing is tracked in [docs/smoke-test.md](docs/smoke-test.md).
