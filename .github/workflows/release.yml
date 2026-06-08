@@ -47,12 +47,19 @@ jobs:
         run: npm run ${{ matrix.script }}
 
       - name: Publish Release Assets
-        uses: softprops/action-gh-release@v2
-        with:
-          fail_on_unmatched_files: false
-          files: |
-            app/dist/*.dmg
-            app/dist/*.zip
-            app/dist/*.exe
-            app/dist/*.AppImage
-            app/dist/*.deb
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-from-tag
+          fi
+
+          shopt -s nullglob
+          files=(app/dist/*.dmg app/dist/*.zip app/dist/*.exe app/dist/*.AppImage app/dist/*.deb)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release assets found"
+            exit 1
+          fi
+
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber

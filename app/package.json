@@ -2,8 +2,16 @@
   "name": "ytmamp",
   "version": "0.3.0",
   "description": "Retro mini-player for YouTube Music with a Chromium extension bridge.",
-  "author": "markoblogo",
+  "author": {
+    "name": "markoblogo",
+    "email": "markoblogo@users.noreply.github.com"
+  },
   "license": "MIT",
+  "homepage": "https://github.com/markoblogo/YTMamp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/markoblogo/YTMamp.git"
+  },
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
@@ -81,6 +89,7 @@
         }
       ],
       "category": "Audio",
+      "maintainer": "markoblogo <markoblogo@users.noreply.github.com>",
       "icon": "assets/icon.png",
       "artifactName": "YTMamp-${version}-linux.${ext}"
     },
