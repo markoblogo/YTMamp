@@ -6,6 +6,10 @@ Use this checklist before promoting a release beyond GitHub assets.
 
 GitHub Release: https://github.com/markoblogo/YTMamp/releases/tag/v0.2.0
 
+Status: **Passed manual macOS smoke**.
+
+Date: 2026-06-08.
+
 Published assets:
 
 - `YTMamp-0.2.0-mac.dmg`
