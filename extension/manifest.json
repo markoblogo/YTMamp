@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "YTMamp",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Retro-style mini-player connector for YouTube Music",
     "background": {
         "service_worker": "src/background.js"

@@ -5,13 +5,16 @@
 
 **License:** MIT. See [LICENSE](LICENSE).
 
-**YTMamp** is a lightweight, retro-inspired mini-player for YouTube Music on macOS. It pairs a high-performance Electron desktop application with a specialized browser extension to give you seamless control over your music without ever leaving your workflow.
+**YTMamp** is a lightweight, retro-inspired mini-player for YouTube Music on desktop. It pairs a high-performance Electron application with a specialized Chromium browser extension to give you seamless control over your music without ever leaving your workflow.
 
 ## Demo
 [![YTMamp demo video](https://img.youtube.com/vi/fHRDm8e2n-U/maxresdefault.jpg)](https://youtu.be/fHRDm8e2n-U)
 
 ### Download
-Get the latest macOS installer from **Releases** (DMG).
+Get the latest desktop build from **Releases**:
+- macOS: `YTMamp-*-mac.dmg`
+- Windows: `YTMamp-*-win.exe` or `YTMamp-*-win.zip`
+- Linux: `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb`
 
 > [!NOTE]
 > YTMamp is an independent open-source project and is not affiliated with Google or YouTube.
@@ -28,13 +31,35 @@ Get the latest macOS installer from **Releases** (DMG).
 
 ---
 
-## 🛠 Installation (Recommended)
+## 🛠 Installation
 
+### macOS
 1. **Download the latest DMG** from the [GitHub Releases](https://github.com/markoblogo/YTMamp/releases).
 2. **Install**: Open the `.dmg` and drag **YTMamp** to your `Applications` folder.
 > [!IMPORTANT]
 > The DMG is an installer. Once installed, launch YTMamp from your **Applications** folder, not from the mounted disk image.
 3. **Launch**: Open YTMamp. You'll see a green icon in your menu bar.
+
+### Windows
+1. Download `YTMamp-*-win.exe` from [GitHub Releases](https://github.com/markoblogo/YTMamp/releases).
+2. Run the installer and launch **YTMamp** from the Start menu.
+3. You should see the YTMamp icon in the system tray.
+
+Portable option: download `YTMamp-*-win.zip`, extract it, and run the app from the extracted folder.
+
+### Linux
+1. Download either `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb` from [GitHub Releases](https://github.com/markoblogo/YTMamp/releases).
+2. For AppImage: make it executable, then run it.
+   ```bash
+   chmod +x YTMamp-*-linux.AppImage
+   ./YTMamp-*-linux.AppImage
+   ```
+3. For Debian/Ubuntu:
+   ```bash
+   sudo apt install ./YTMamp-*-linux.deb
+   ```
+
+Linux tray visibility depends on the desktop environment and AppIndicator/system tray support.
 
 ### 🧩 Browser Extension Setup
 Currently, the extension is installed in "Unpacked" mode:
@@ -74,8 +99,10 @@ npm install
 npm run check
 npm start
 
-# For subsequent builds
-npm run dist
+# For platform builds
+npm run dist:mac
+npm run dist:win
+npm run dist:linux
 ```
 
 ### Protocol
@@ -87,12 +114,16 @@ Tested Chromium browsers are documented in [docs/browser-support.md](docs/browse
 ### Release QA
 Release smoke testing is tracked in [docs/smoke-test.md](docs/smoke-test.md).
 
+### Cross-platform notes
+Windows/Linux packaging and tray/autostart checks are tracked in [docs/cross-platform.md](docs/cross-platform.md).
+
 ### Build Releases Locally
-To generate the `.dmg` and `.zip` artifacts on your own machine:
+To generate platform release artifacts on your own machine:
 ```bash
 cd app
-npm run clean
-npm run dist
+npm run dist:mac    # macOS DMG + ZIP
+npm run dist:win    # Windows NSIS installer + ZIP
+npm run dist:linux  # Linux AppImage + DEB
 ```
 Find your builds in `app/dist/`.
 

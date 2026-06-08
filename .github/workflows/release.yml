@@ -9,8 +9,18 @@ permissions:
   contents: write
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+          - os: windows-latest
+            script: dist:win
+          - os: ubuntu-latest
+            script: dist:linux
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,13 +36,23 @@ jobs:
         working-directory: app
         run: npm ci
 
-      - name: Build DMG/ZIP
+      - name: Install Linux packaging deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
+
+      - name: Build release assets
         working-directory: app
-        run: npm run dist
+        run: npm run ${{ matrix.script }}
 
       - name: Publish Release Assets
         uses: softprops/action-gh-release@v2
         with:
+          fail_on_unmatched_files: false
           files: |
             app/dist/*.dmg
             app/dist/*.zip
+            app/dist/*.exe
+            app/dist/*.AppImage
+            app/dist/*.deb

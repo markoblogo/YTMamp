@@ -1,12 +1,15 @@
 {
   "name": "ytmamp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "clean": "rm -rf dist",
+    "clean": "node scripts/clean.js",
     "prebuild": "npm run clean",
-    "dist": "npm run clean && electron-builder --mac",
+    "dist": "npm run clean && electron-builder --mac --win --linux",
+    "dist:mac": "npm run clean && electron-builder --mac",
+    "dist:win": "npm run clean && electron-builder --win",
+    "dist:linux": "npm run clean && electron-builder --linux",
     "lint": "node scripts/check-js.js",
     "test": "node --test",
     "check": "npm run lint && npm test"
@@ -33,6 +36,50 @@
       "category": "public.app-category.music",
       "icon": "assets/icon.png",
       "artifactName": "YTMamp-${version}-mac.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "YTMamp-${version}-win.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Audio",
+      "icon": "assets/icon.png",
+      "artifactName": "YTMamp-${version}-linux.${ext}"
     },
     "dmg": {
       "title": "Install YTMamp",

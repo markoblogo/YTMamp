@@ -35,6 +35,39 @@ function saveSettings() {
     }
 }
 
+function quoteDesktopExec(value) {
+    return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function applyLinuxAutostart() {
+    const autostartDir = path.join(app.getPath('home'), '.config', 'autostart');
+    const desktopFile = path.join(autostartDir, 'ytmamp.desktop');
+
+    try {
+        if (!settings.startAtLogin) {
+            if (fs.existsSync(desktopFile)) fs.unlinkSync(desktopFile);
+            console.log('[Main] Linux autostart disabled');
+            return;
+        }
+
+        fs.mkdirSync(autostartDir, { recursive: true });
+        fs.writeFileSync(desktopFile, [
+            '[Desktop Entry]',
+            'Type=Application',
+            'Version=1.0',
+            'Name=YTMamp',
+            'Comment=Start YTMamp at login',
+            `Exec=${quoteDesktopExec(app.getPath('exe'))}`,
+            'Terminal=false',
+            'X-GNOME-Autostart-enabled=true',
+            ''
+        ].join('\n'));
+        console.log('[Main] Linux autostart enabled');
+    } catch (e) {
+        console.error('[Main] Failed to apply Linux autostart:', e);
+    }
+}
+
 function applyAutostart() {
     if (process.platform === 'darwin' || process.platform === 'win32') {
         app.setLoginItemSettings({
@@ -42,6 +75,8 @@ function applyAutostart() {
             path: app.getPath('exe')
         });
         console.log(`[Main] Autostart set to: ${settings.startAtLogin}`);
+    } else if (process.platform === 'linux') {
+        applyLinuxAutostart();
     }
 }
 

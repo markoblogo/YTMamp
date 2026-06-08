@@ -19,7 +19,10 @@ This launches the Electron main process from `src/main/main.js` and loads the re
 ### Build / package the app
 
 - Clean build artifacts: `npm run clean`
-- Build macOS distributables (DMG + ZIP via electron-builder): `npm run dist`
+- Build all distributables via electron-builder: `npm run dist`
+- Build macOS distributables (DMG + ZIP): `npm run dist:mac`
+- Build Windows distributables (NSIS + ZIP): `npm run dist:win`
+- Build Linux distributables (AppImage + DEB): `npm run dist:linux`
 
 Artifacts will be written to `dist/` using the configuration under the `build` key in `package.json`.
 
@@ -44,7 +47,7 @@ Electron is configured via `package.json`:
 
 - `main`: `src/main/main.js`
 - `scripts.start`: `electron .` (entry is `main` above)
-- `build` (electron-builder): config for macOS targets, output directories, and included files.
+- `build` (electron-builder): config for macOS, Windows, and Linux targets, output directories, and included files.
 
 ### Main process (`src/main`)
 
@@ -55,7 +58,7 @@ Electron is configured via `package.json`:
 - Loads the renderer HTML from `src/renderer/index.html` and injects the preload script from `src/main/preload.js`.
 - Manages a system tray (`Tray`) with a context menu for:
   - Toggling the main window visibility
-  - Toggling "Start at login" (autostart) and applying it via `app.setLoginItemSettings`
+  - Toggling "Start at login" (autostart) and applying it via `app.setLoginItemSettings` on macOS/Windows or XDG autostart on Linux
   - Toggling "Auto-show on play" behavior
   - Quitting the app
 - Implements **settings persistence**:

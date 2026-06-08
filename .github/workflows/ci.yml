@@ -8,7 +8,14 @@ on:
 
 jobs:
   app-checks:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 

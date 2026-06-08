@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-06-09
+### Added
+- Windows release targets: NSIS installer and ZIP archive.
+- Linux release targets: AppImage and DEB package.
+- Cross-platform CI matrix for macOS, Windows, and Ubuntu.
+- Linux autostart support via `~/.config/autostart/ytmamp.desktop`.
+- Platform-specific installation and smoke-test documentation.
+
+### Changed
+- Release workflow now builds platform assets on matching GitHub-hosted runners.
+- Local build scripts now expose `dist:mac`, `dist:win`, and `dist:linux`.
+
 ## [0.2.0] - 2026-06-08
 ### Added
 - Like, dislike, shuffle, and repeat command support.
