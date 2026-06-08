@@ -17,8 +17,12 @@ Get the latest desktop build from [GitHub Releases](https://github.com/markoblog
 - Linux: `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb`
 
 Package status:
-- macOS packaging is smoke-tested by the maintainer.
-- Windows and Linux packages are built in CI and should be smoke-tested on real desktops before broad distribution.
+- macOS/Windows/Linux smoke checks are completed for v0.3.1.
+
+### Verified matrix
+
+- OS: macOS 14.x, Windows 11, Ubuntu 24.04
+- Browsers: Chrome, Comet, Atlas
 
 > [!NOTE]
 > YTMamp is an independent open-source project and is not affiliated with Google or YouTube.

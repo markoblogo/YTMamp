@@ -47,9 +47,9 @@ Track metadata is normalized before renderer IPC:
 
 ## Security TODO
 
-The v0.2.0 bridge is still localhost-only and validates payload shape, but it does not yet require pairing.
+The v0.3.x bridge is still localhost-only and validates payload shape, but it does not yet require pairing.
 
-For v0.3.0, add a shared secret/token handshake:
+For v0.3.1+, add a shared secret/token handshake:
 
 - Generate a per-install token in the Electron app.
 - Expose pairing/reset UX in the extension popup.

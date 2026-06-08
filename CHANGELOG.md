@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-06-09
+### Added
+- Stabilization notes for Windows and Linux release artifacts and manual smoke checks.
+- Documented verified desktop/browser matrix for users and contributors.
+
+### Changed
+- Updated app/extension versions to `0.3.1` for the stabilization patch release.
+- Cleaned up tray lifecycle and autostart wiring for cross-platform shutdown and reconnect paths.
+
+### Fixed
+- Added defensive tray click guard when window is not available.
+- Improved Windows/macOS autostart behavior to avoid hidden startup mode.
+- Ensured tray object is released on app shutdown.
+
 ## [0.3.0] - 2026-06-09
 ### Added
 - Windows release targets: NSIS installer and ZIP archive.

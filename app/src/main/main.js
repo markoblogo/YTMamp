@@ -72,6 +72,7 @@ function applyAutostart() {
     if (process.platform === 'darwin' || process.platform === 'win32') {
         app.setLoginItemSettings({
             openAtLogin: settings.startAtLogin,
+            openAsHidden: false,
             path: app.getPath('exe')
         });
         console.log(`[Main] Autostart set to: ${settings.startAtLogin}`);
@@ -215,7 +216,7 @@ function createTray() {
     updateTrayMenu();
 
     tray.on('click', () => {
-        toggleWindow();
+        if (mainWindow) toggleWindow();
     });
 }
 
@@ -332,4 +333,5 @@ app.on('window-all-closed', function () {
 app.on('before-quit', () => {
     isQuitting = true;
     if (bridge) bridge.stop();
+    if (tray) tray.destroy();
 });

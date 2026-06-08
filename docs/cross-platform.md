@@ -1,17 +1,17 @@
 # Cross-platform release notes
 
-YTMamp v0.3.0 adds first-class packaging targets for macOS, Windows, and Linux.
+YTMamp v0.3.x adds first-class packaging targets for macOS, Windows, and Linux.
 
 ## Release assets
 
-Expected assets for a `v0.3.0` release:
+Expected assets for a `v0.3.x` release:
 
-- `YTMamp-0.3.0-mac.dmg`
-- `YTMamp-0.3.0-mac.zip`
-- `YTMamp-0.3.0-win.exe`
-- `YTMamp-0.3.0-win.zip`
-- `YTMamp-0.3.0-linux.AppImage`
-- `YTMamp-0.3.0-linux.deb`
+- `YTMamp-${VERSION}-mac.dmg`
+- `YTMamp-${VERSION}-mac.zip`
+- `YTMamp-${VERSION}-win.exe`
+- `YTMamp-${VERSION}-win.zip`
+- `YTMamp-${VERSION}-linux.AppImage`
+- `YTMamp-${VERSION}-linux.deb`
 
 ## Platform smoke checklist
 
@@ -48,3 +48,9 @@ CI verifies install/lint/test and release packaging. Tray behavior, autostart, a
 - Linux tray behavior depends on the desktop environment. GNOME setups may need AppIndicator support.
 - Linux autostart uses the XDG autostart desktop entry path rather than Electron login item settings.
 - Browser extension setup remains unpacked and per browser profile.
+
+## v0.3.1 stabilization status
+
+- Desktop smoke checks completed on Windows 11 and Ubuntu 24.04.
+- Tray/menu behavior, autostart persistence and window placement checks passed.
+- Verified Chromium browser set: Chrome, Comet, Atlas.
