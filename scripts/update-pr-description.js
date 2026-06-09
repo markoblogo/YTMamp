@@ -25,12 +25,14 @@ async function request(payloadUrl, method, body, token, repo) {
 async function run() {
     const token = process.env.GITHUB_TOKEN;
     if (!token) {
-        throw new Error('GITHUB_TOKEN is required');
+        console.log('SKIP: GITHUB_TOKEN is not available');
+        return;
     }
 
     const eventPath = process.env.GITHUB_EVENT_PATH;
     if (!eventPath || !fs.existsSync(eventPath)) {
-        throw new Error('GITHUB_EVENT_PATH is missing');
+        console.log('SKIP: GITHUB_EVENT_PATH is missing');
+        return;
     }
     const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
     if (!event.pull_request) {
@@ -40,7 +42,8 @@ async function run() {
 
     const summaryPath = path.join(process.cwd(), 'pr-smoke-summary.md');
     if (!fs.existsSync(summaryPath)) {
-        throw new Error('pr-smoke-summary.md missing; run generate-pr-smoke-summary.js first');
+        console.log('SKIP: pr-smoke-summary.md is missing');
+        return;
     }
     const summary = fs.readFileSync(summaryPath, 'utf8');
 
@@ -75,6 +78,6 @@ async function run() {
 }
 
 run().catch((e) => {
-    console.error(e.message);
-    process.exit(1);
+    console.error(`[WARN] ${e.message}`);
+    // best-effort: never fail CI on PR description update issues
 });
