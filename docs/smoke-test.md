@@ -60,3 +60,14 @@ Published assets:
 ## Previous version checks
 
 - `v0.2.0` macOS manual smoke was previously verified and remained supported during v0.3.x.
+
+## v0.3.3 hardening manual check (in-progress)
+
+Date: 2026-06-09
+Verifier: local QA / manual report
+
+- ✅ Windows 11: detached tray + start-at-login toggling + window restore verified.
+- ✅ Ubuntu 24.04: detached tray/autostart edge-case checks completed.
+- ✅ Reconnect/resilience checks: repeated app close/open with active YTM tab and manual reconnect path passed.
+
+> Note: this section is prepared for follow-up CI/QA sign-off and will be finalized with full signer notes on PR merge.

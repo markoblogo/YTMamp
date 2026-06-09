@@ -2,6 +2,81 @@ let socket = null;
 let isConnected = false;
 let isConnecting = false;
 let autoConnect = true;
+const WS_ENDPOINT = 'ws://127.0.0.1:18765';
+const WS_RETRY_BASE_MS = 800;
+const WS_RETRY_MAX_MS = 12000;
+const WS_HEARTBEAT_MS = 15000;
+const WS_HEARTBEAT_TIMEOUT_MS = 5000;
+let reconnectAttempt = 0;
+let reconnectTimer = null;
+let heartbeatTimer = null;
+let heartbeatTimeout = null;
+let manualDisconnect = false;
+let reconnectScheduled = false;
+
+function setStatus(msg) {
+    chrome.runtime.sendMessage({ type: 'status', v: 1, msg }).catch(() => { });
+}
+
+function clearTimers() {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+    if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+    }
+    if (heartbeatTimeout) {
+        clearTimeout(heartbeatTimeout);
+        heartbeatTimeout = null;
+    }
+    reconnectScheduled = false;
+}
+
+function resetRecovery() {
+    reconnectAttempt = 0;
+}
+
+function nextReconnectDelayMs() {
+    const exp = Math.min(reconnectAttempt, 8);
+    return Math.min(WS_RETRY_MAX_MS, WS_RETRY_BASE_MS * Math.pow(2, exp));
+}
+
+function scheduleReconnect() {
+    if (!autoConnect || manualDisconnect) return;
+    if (reconnectScheduled) return;
+
+    const delay = nextReconnectDelayMs();
+    reconnectAttempt += 1;
+    const attempt = reconnectAttempt;
+    reconnectScheduled = true;
+    clearTimers();
+    reconnectTimer = setTimeout(() => {
+        reconnectScheduled = false;
+        console.log(`[Extension] Reconnect attempt #${attempt} after ${delay}ms`);
+        setStatus(`OFFLINE (${delay}ms)`);
+        socket = null;
+        setupWebSocket(true);
+    }, delay);
+}
+
+function armHeartbeat() {
+    clearTimeout(heartbeatTimeout);
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(() => {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        try {
+            socket.send(JSON.stringify({ type: 'ping', v: 1 }));
+            heartbeatTimeout = setTimeout(() => {
+                console.error('[YTMamp] Heartbeat timeout: closing socket');
+                socket.close();
+            }, WS_HEARTBEAT_TIMEOUT_MS);
+        } catch (err) {
+            console.error('[YTMamp] Failed to send heartbeat:', err);
+        }
+    }, WS_HEARTBEAT_MS);
+}
 
 // Load settings
 chrome.storage.sync.get({ autoConnect: true }, (data) => {
@@ -32,17 +107,22 @@ function setupWebSocket(isRetry = false) {
 
     isConnecting = true;
     if (!isRetry) console.log('[Extension] Attempting connection...');
+    if (isRetry) {
+        console.log(`[Extension] Reconnect attempt #${reconnectAttempt}`);
+    }
 
-    // Status update for popup
-    chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'WAITING' }).catch(() => { });
+    clearTimers();
+    setStatus('WAITING');
 
-    socket = new WebSocket('ws://127.0.0.1:18765');
+    socket = new WebSocket(WS_ENDPOINT);
 
     socket.onopen = () => {
         isConnected = true;
         isConnecting = false;
         console.log('[Extension] Connected to Electron app');
-        chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'CONNECTED' }).catch(() => { });
+        resetRecovery();
+        setStatus('CONNECTED');
+        armHeartbeat();
         // Immediately check tab after connection
         setTimeout(checkTabStatus, 500);
     };
@@ -55,6 +135,11 @@ function setupWebSocket(isRetry = false) {
             if (message.type === 'app') {
                 lastAppStatus.windowVisible = message.windowVisible;
                 chrome.runtime.sendMessage({ type: 'app', v: 1, windowVisible: message.windowVisible }).catch(() => { });
+                return;
+            }
+
+            if (message.type === 'pong') {
+                clearTimeout(heartbeatTimeout);
                 return;
             }
 
@@ -80,15 +165,20 @@ function setupWebSocket(isRetry = false) {
         isConnected = false;
         isConnecting = false;
         socket = null;
-        chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'OFFLINE' }).catch(() => { });
+        clearTimers();
+        setStatus('OFFLINE');
 
         if (autoConnect) {
-            setTimeout(() => setupWebSocket(true), 2000);
+            scheduleReconnect();
         }
     };
 
     socket.onerror = (err) => {
         isConnecting = false;
+        console.error('[YTMamp] Socket error:', err && err.message ? err.message : err);
+        if (autoConnect && !manualDisconnect) {
+            scheduleReconnect();
+        }
     };
 }
 
@@ -129,6 +219,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Settings toggle
     if (message.type === 'toggle_auto') {
         autoConnect = message.value;
+        if (!autoConnect) {
+            manualDisconnect = true;
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+                socket.close();
+            }
+            clearTimers();
+        } else {
+            manualDisconnect = false;
+        }
         if (autoConnect) setupWebSocket();
         return;
     }
@@ -136,6 +235,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Manual connect
     if (message.type === 'manual_connect') {
         autoConnect = true;
+        manualDisconnect = false;
+        resetRecovery();
         chrome.storage.sync.set({ autoConnect: true });
         setupWebSocket();
         return;
@@ -144,6 +245,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Manual disconnect
     if (message.type === 'manual_disconnect') {
         autoConnect = false;
+        manualDisconnect = true;
+        clearTimers();
         chrome.storage.sync.set({ autoConnect: false });
         if (socket) socket.close();
         return;

@@ -18,6 +18,7 @@ Get the latest desktop build from [GitHub Releases](https://github.com/markoblog
 
 Package status:
 - macOS/Windows/Linux smoke checks are completed for v0.3.2.
+- v0.3.3 hardening tasks are in-progress (`deterministic reconnect`, `tray/autostart proof`, and PR smoke summary automation).
 
 ### Verified matrix
 

@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   app-checks:
     strategy:
@@ -40,8 +44,22 @@ jobs:
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js
 
+      - name: Validate CI smoke checklist
+        run: node scripts/validate-smoke-checklist.js
+
+      - name: Generate PR smoke summary
+        if: github.event_name == 'pull_request'
+        run: node scripts/generate-pr-smoke-summary.js
+
       - name: Upload smoke checklist artifact
         uses: actions/upload-artifact@v4
         with:
           name: smoke-check-${{ matrix.os }}-${{ github.sha }}
           path: ci-smoke-checklist.md
+
+      - name: Update PR description with smoke summary
+        if: github.event_name == 'pull_request' && matrix.os == 'macos-latest'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/update-pr-description.js

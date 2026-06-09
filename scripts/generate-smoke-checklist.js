@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
 
-const out = `# YTMamp CI smoke checklist (v0.3.2)
+let version = '0.0.0';
+try {
+    const appPackagePath = path.join(__dirname, '../app/package.json');
+    version = JSON.parse(fs.readFileSync(appPackagePath, 'utf8')).version || version;
+} catch (_e) {
+    // keep fallback in non-standard environments
+}
+
+const out = `# YTMamp CI smoke checklist (v${version})
 
 Generated at: ${new Date().toISOString()}
 Source: GitHub Actions matrix run
@@ -26,7 +35,7 @@ Source: GitHub Actions matrix run
 - [ ] Toggle Start at login while the window is hidden/minimized.
 - [ ] Close/reopen app repeatedly (3x) while tray is used for show/hide.
 - [ ] Toggle "Auto-show on play" while no active YouTube Music tab is connected.
-- [ ] Verify app remains connected state-safe when YTM tab closes (`Need YTM Tab`).
+- [ ] Verify app remains connected state-safe when YTM tab closes ('Need YTM Tab').
 
 ## Browser + playback checks (manual)
 

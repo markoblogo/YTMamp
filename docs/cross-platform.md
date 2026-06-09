@@ -59,3 +59,12 @@ CI verifies install/lint/test and release packaging. Tray behavior, autostart, a
 
 - CI now emits `ci-smoke-checklist.md` per matrix OS and uploads it as an artifact.
 - Edge-case cases added for autostart toggling while detached/minimized and repeated close/reopen cycles.
+
+## v0.3.3 hardening prep
+
+- Added CI smoke-check enforcement so `ci-smoke-checklist.md` must be generated in matrix jobs.
+- Added automated PR-surface smoke summary artifact flow:
+  - `scripts/generate-pr-smoke-summary.js`
+  - `scripts/update-pr-description.js`
+  - CI updates PR description on macOS matrix completion (best effort).
+- Prepared deterministic socket reconnection in extension background with heartbeat and bounded exponential retry.
