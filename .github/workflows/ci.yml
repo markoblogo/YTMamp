@@ -36,3 +36,12 @@ jobs:
       - name: Test
         working-directory: app
         run: npm test
+
+      - name: Generate CI smoke checklist
+        run: node scripts/generate-smoke-checklist.js
+
+      - name: Upload smoke checklist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-check-${{ matrix.os }}-${{ github.sha }}
+          path: ci-smoke-checklist.md

@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-06-09
+### Added
+- Added CI smoke-checklist generator artifact for every OS matrix run.
+- Added detached tray/autostart hardening checks to the release smoke plan.
+
+### Changed
+- Hardened settings parsing around `startAtLogin`, `autoShowOnPlay`, and startup window bounds.
+- Improved tray safety when window is closed/hidden before click actions.
+
+### Fixed
+- Guarded autostart application with error handling and explicit success/failure path.
+- Added robust guard around tray/window lifecycle edge cases in startup and runtime.
+
 ## [0.3.1] - 2026-06-09
 ### Added
 - Stabilization notes for Windows and Linux release artifacts and manual smoke checks.

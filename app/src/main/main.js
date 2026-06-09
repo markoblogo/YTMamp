@@ -21,9 +21,15 @@ function loadSettings() {
         if (fs.existsSync(settingsPath)) {
             const data = fs.readFileSync(settingsPath, 'utf8');
             settings = { ...settings, ...JSON.parse(data) };
+            settings.startAtLogin = typeof settings.startAtLogin === 'boolean' ? settings.startAtLogin : !!settings.startAtLogin;
+            settings.autoShowOnPlay = typeof settings.autoShowOnPlay === 'boolean' ? settings.autoShowOnPlay : true;
+            if (settings.windowBounds && (typeof settings.windowBounds.x !== 'number' || typeof settings.windowBounds.y !== 'number')) {
+                settings.windowBounds = null;
+            }
         }
     } catch (e) {
         console.error('[Main] Failed to load settings:', e);
+        settings = { ...settings };
     }
 }
 
@@ -69,16 +75,25 @@ function applyLinuxAutostart() {
 }
 
 function applyAutostart() {
-    if (process.platform === 'darwin' || process.platform === 'win32') {
-        app.setLoginItemSettings({
-            openAtLogin: settings.startAtLogin,
-            openAsHidden: false,
-            path: app.getPath('exe')
-        });
-        console.log(`[Main] Autostart set to: ${settings.startAtLogin}`);
-    } else if (process.platform === 'linux') {
-        applyLinuxAutostart();
+    try {
+        if (process.platform === 'darwin' || process.platform === 'win32') {
+            app.setLoginItemSettings({
+                openAtLogin: settings.startAtLogin,
+                openAsHidden: false,
+                path: app.getPath('exe')
+            });
+            console.log(`[Main] Autostart set to: ${settings.startAtLogin}`);
+            return true;
+        }
+        if (process.platform === 'linux') {
+            applyLinuxAutostart();
+            return true;
+        }
+    } catch (e) {
+        console.error('[Main] Failed to apply autostart:', e);
     }
+
+    return false;
 }
 
 function broadcastSettings() {
@@ -221,6 +236,7 @@ function createTray() {
 }
 
 function toggleWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isVisible()) {
         mainWindow.hide();
     } else {

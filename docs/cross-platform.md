@@ -49,8 +49,13 @@ CI verifies install/lint/test and release packaging. Tray behavior, autostart, a
 - Linux autostart uses the XDG autostart desktop entry path rather than Electron login item settings.
 - Browser extension setup remains unpacked and per browser profile.
 
-## v0.3.1 stabilization status
+## v0.3.2 stabilization status
 
-- Desktop smoke checks completed on Windows 11 and Ubuntu 24.04.
+- Desktop smoke checks completed on macOS, Windows 11 and Ubuntu 24.04.
 - Tray/menu behavior, autostart persistence and window placement checks passed.
 - Verified Chromium browser set: Chrome, Comet, Atlas.
+
+## v0.3.2 checklist automation
+
+- CI now emits `ci-smoke-checklist.md` per matrix OS and uploads it as an artifact.
+- Edge-case cases added for autostart toggling while detached/minimized and repeated close/reopen cycles.

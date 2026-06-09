@@ -17,7 +17,7 @@ Get the latest desktop build from [GitHub Releases](https://github.com/markoblog
 - Linux: `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb`
 
 Package status:
-- macOS/Windows/Linux smoke checks are completed for v0.3.1.
+- macOS/Windows/Linux smoke checks are completed for v0.3.2.
 
 ### Verified matrix
 
