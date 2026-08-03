@@ -39,7 +39,7 @@ jobs:
 
       - name: Test
         working-directory: app
-        run: npm test && npm run test:smoke
+        run: npm test
 
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js

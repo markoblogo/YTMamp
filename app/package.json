@@ -22,7 +22,7 @@
     "dist:win": "npm run clean && electron-builder --win --publish never",
     "dist:linux": "npm run clean && electron-builder --linux --publish never",
     "lint": "node scripts/check-js.js",
-    "test": "node --test",
+    "test": "node --test && npm run test:smoke",
     "test:smoke": "node --test test/integration_api_smoke.test.js",
     "check": "npm run lint && npm test"
   },

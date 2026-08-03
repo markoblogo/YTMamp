@@ -394,6 +394,45 @@ async function requestStatusRaw({ serverUrl, path = '/status', headers = {}, met
     });
 }
 
+async function requestEventsResponse({ serverUrl, path = '/events', headers = {} }) {
+    return await new Promise((resolve, reject) => {
+        let settled = false;
+        const finalize = (result) => {
+            if (settled) return;
+            settled = true;
+            resolve(result);
+        };
+
+        const req = http.request(`${serverUrl}${path}`, {
+            method: 'GET',
+            headers
+        }, (res) => {
+            let body = '';
+            const result = {
+                statusCode: res.statusCode,
+                headers: res.headers,
+                body
+            };
+            res.on('data', (chunk) => {
+                if (result.body.length < 256) {
+                    result.body += chunk.toString();
+                }
+            });
+            res.on('end', () => finalize(result));
+            res.on('close', () => finalize(result));
+
+            if (res.statusCode === 200) {
+                res.destroy();
+            }
+        });
+
+        req.on('error', (error) => {
+            if (!settled) reject(error);
+        });
+        req.end();
+    });
+}
+
 test('returns 204 for /current-track when absent and 200 when present', async () => {
     const fixture = createSmokeIntegrationServer();
     await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
@@ -414,6 +453,66 @@ test('returns 204 for /current-track when absent and 200 when present', async ()
 
         const data = JSON.parse(response.body);
         assert.equal(data.track.title, 'Track A');
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('returns 401 for /events when token mismatch and exposes API version', async () => {
+    const fixture = createSmokeIntegrationServer({ integrationToken: 'test-token' });
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        const response = await requestEventsResponse({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            path: '/events?token=wrong'
+        });
+        assert.equal(response.statusCode, 401);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('returns 400 for unsupported API version on /events and includes API version header', async () => {
+    const fixture = createSmokeIntegrationServer();
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        const response = await requestEventsResponse({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            path: '/events?api_version=99'
+        });
+        assert.equal(response.statusCode, 400);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
+        const payload = JSON.parse(response.body);
+        assert.equal(payload.error, 'UNSUPPORTED_API_VERSION');
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('returns 429 for /events under rate limit and exposes API version header', async () => {
+    const fixture = createSmokeIntegrationServer({ integrationToken: 'test-token' });
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        for (let i = 0; i < 3; i += 1) {
+            const response = await requestEventsResponse({
+                serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+                path: '/events?token=test-token'
+            });
+            assert.equal(response.statusCode, 200);
+            assert.equal(response.headers['content-type'], 'text/event-stream; charset=utf-8');
+        }
+
+        const response = await requestEventsResponse({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            path: '/events?token=test-token'
+        });
+        assert.equal(response.statusCode, 429);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
+        assert.equal(response.body, 'rate limit exceeded');
     } finally {
         await closeServer(fixture.server);
     }
