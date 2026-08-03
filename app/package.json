@@ -23,6 +23,7 @@
     "dist:linux": "npm run clean && electron-builder --linux --publish never",
     "lint": "node scripts/check-js.js",
     "test": "node --test",
+    "test:smoke": "node --test test/integration_api_smoke.test.js",
     "check": "npm run lint && npm test"
   },
   "dependencies": {

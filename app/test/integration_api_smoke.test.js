@@ -9,7 +9,7 @@ const {
     validateIntegrationEventEnvelope
 } = require('../src/main/integration_api_contract');
 
-function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
+function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: overrideIsLocalRequest = null } = {}) {
     const INTEGRATION_HOST = '127.0.0.1';
     const INTEGRATION_PORT = 18990;
     const MAX_SSE_CLIENTS = 2;
@@ -34,11 +34,14 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
         };
     }
 
-    function isLocalRequest(req) {
+    const integrationHeaders = {
+        'x-ytmamp-api-version': String(INTEGRATION_API_VERSION)
+    };
+    const isLocalRequest = overrideIsLocalRequest || ((req) => {
         const raw = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : '';
         const ip = raw === '::1' ? '127.0.0.1' : (raw.startsWith('::ffff:') ? raw.replace('::ffff:', '') : raw);
         return ip === '127.0.0.1' || ip === '::1';
-    }
+    });
 
     function isAuthorized(req, queryToken) {
         if (!integrationToken) return true;
@@ -98,13 +101,16 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
 
     const server = http.createServer((req, res) => {
         if (!req.url) {
-            res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+            res.writeHead(400, integrationHeaders);
             res.end('bad request');
             return;
         }
 
         if (!isLocalRequest(req)) {
-            res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+            res.writeHead(403, {
+                ...integrationHeaders,
+                'content-type': 'text/plain; charset=utf-8'
+            });
             res.end('forbidden');
             return;
         }
@@ -116,6 +122,7 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
 
         if (!isSupportedIntegrationApiVersion(apiVersion)) {
             res.writeHead(400, {
+                ...integrationHeaders,
                 'content-type': 'application/json; charset=utf-8',
                 'cache-control': 'no-store',
                 'x-ytmamp-api-version': String(INTEGRATION_API_VERSION)
@@ -131,6 +138,7 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
 
         if (!isAuthorized(req, token)) {
             res.writeHead(401, {
+                ...integrationHeaders,
                 'www-authenticate': 'Bearer realm="ytmamp-local"',
                 'content-type': 'text/plain; charset=utf-8'
             });
@@ -142,6 +150,7 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
         const bucket = getRateBucket(ip);
         if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
             res.writeHead(429, {
+                ...integrationHeaders,
                 'content-type': 'text/plain; charset=utf-8',
                 'retry-after': String(getRetryAfterMs(bucket))
             });
@@ -156,7 +165,10 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
 
         if (req.method === 'GET' && parsedUrl.pathname === '/current-track') {
             if (!track) {
-                res.writeHead(204, { 'cache-control': 'no-store' });
+                res.writeHead(204, {
+                    ...integrationHeaders,
+                    'cache-control': 'no-store'
+                });
                 res.end();
                 return;
             }
@@ -165,18 +177,23 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
             return;
         }
 
-        if (req.method === 'GET' && parsedUrl.pathname === '/events') {
-            if (sseClients.size >= MAX_SSE_CLIENTS) {
-                res.writeHead(429, { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '1' });
-                res.end('too many SSE clients');
-                return;
-            }
+            if (req.method === 'GET' && parsedUrl.pathname === '/events') {
+                if (sseClients.size >= MAX_SSE_CLIENTS) {
+                    res.writeHead(429, {
+                        ...integrationHeaders,
+                        'content-type': 'text/plain; charset=utf-8',
+                        'retry-after': '1'
+                    });
+                    res.end('too many SSE clients');
+                    return;
+                }
 
-            res.writeHead(200, {
-                'content-type': 'text/event-stream; charset=utf-8',
-                'cache-control': 'no-store',
-                connection: 'keep-alive'
-            });
+                res.writeHead(200, {
+                    ...integrationHeaders,
+                    'content-type': 'text/event-stream; charset=utf-8',
+                    'cache-control': 'no-store',
+                    connection: 'keep-alive'
+                });
             res.write(': connected\n\n');
             writeSseEvent(res, {
                 type: 'snapshot',
@@ -201,7 +218,6 @@ function createSmokeIntegrationServer({ integrationToken = '' } = {}) {
         track = value;
         state = { playing: Boolean(value) };
         lastTs = Date.now();
-        lastStateTs = lastTs;
     }
 
     function setStatus(value) {
@@ -304,14 +320,35 @@ test('returns 401 when token mismatch and 400 for unsupported version', async ()
             path: '/status?token=wrong'
         });
         assert.equal(response.statusCode, 401);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
 
         response = await requestStatus({
             serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
             path: '/status?api_version=99'
         });
         assert.equal(response.statusCode, 400);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
         const payload = JSON.parse(response.body);
         assert.equal(payload.error, 'UNSUPPORTED_API_VERSION');
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('returns 403 for /events from non-local source', async () => {
+    const fixture = createSmokeIntegrationServer({
+        integrationToken: 'test-token',
+        isLocalRequest: () => false
+    });
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        const response = await requestStatus({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            path: '/events?token=test-token'
+        });
+        assert.equal(response.statusCode, 403);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
     } finally {
         await closeServer(fixture.server);
     }
@@ -336,6 +373,7 @@ test('applies rate limiting with 429', async () => {
             path: '/status'
         });
         assert.equal(response.statusCode, 429);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
     } finally {
         await closeServer(fixture.server);
     }
