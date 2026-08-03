@@ -9,11 +9,12 @@ const summaryPath = path.join(appDir, 'ci-smoke-summary.md');
 const outputPath = path.join(appDir, 'ci-smoke-output.log');
 
 const isWindows = process.platform === 'win32';
-const testCommand = isWindows ? 'npm.cmd' : 'npm';
+const testCommand = 'npm';
 const testArgs = ['test'];
 const testResult = spawnSync(testCommand, testArgs, {
     cwd: appDir,
     encoding: 'utf8',
+    shell: isWindows,
     timeout: 10 * 60 * 1000,
     maxBuffer: 10 * 1024 * 1024
 });
