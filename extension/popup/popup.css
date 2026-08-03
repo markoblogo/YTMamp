@@ -197,3 +197,39 @@ body {
 #info-note p:last-child {
     margin-bottom: 0;
 }
+
+#bridge-token-area {
+    margin-top: 2px;
+    padding-top: 8px;
+    border-top: 1px solid #222;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#bridge-token-area label {
+    font-size: 9px;
+    color: #888;
+}
+
+#bridge-token-row {
+    display: flex;
+    gap: 6px;
+}
+
+#bridge-token {
+    flex: 1;
+    height: 22px;
+    background: #111;
+    border: 1px solid #333;
+    color: #00ff00;
+    padding: 0 6px;
+    font-size: 9px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+#bridge-token:focus {
+    border-color: #00ff00;
+    outline: none;
+}

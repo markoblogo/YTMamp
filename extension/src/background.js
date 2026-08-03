@@ -1,5 +1,6 @@
 let socket = null;
 let isConnected = false;
+let isAuthenticated = false;
 let isConnecting = false;
 let autoConnect = true;
 const WS_ENDPOINT = 'ws://127.0.0.1:18765';
@@ -13,6 +14,15 @@ let heartbeatTimer = null;
 let heartbeatTimeout = null;
 let manualDisconnect = false;
 let reconnectScheduled = false;
+let bridgeAuthToken = '';
+
+function getSocketEndpoint() {
+    return bridgeAuthToken ? `${WS_ENDPOINT}?token=${encodeURIComponent(bridgeAuthToken)}` : WS_ENDPOINT;
+}
+
+function sanitizeToken(value) {
+    return typeof value === 'string' ? value.trim().slice(0, 512) : '';
+}
 
 function setStatus(msg) {
     chrome.runtime.sendMessage({ type: 'status', v: 1, msg }).catch(() => { });
@@ -78,9 +88,16 @@ function armHeartbeat() {
     }, WS_HEARTBEAT_MS);
 }
 
+function loadBridgeStateFromStorage(callback) {
+    chrome.storage.sync.get({ autoConnect: true, bridgeAuthToken: '' }, (data) => {
+        bridgeAuthToken = sanitizeToken(data.bridgeAuthToken);
+        autoConnect = data.autoConnect;
+        if (callback) callback();
+    });
+}
+
 // Load settings
-chrome.storage.sync.get({ autoConnect: true }, (data) => {
-    autoConnect = data.autoConnect;
+loadBridgeStateFromStorage(() => {
     if (autoConnect) setupWebSocket();
 });
 
@@ -113,73 +130,115 @@ function setupWebSocket(isRetry = false) {
 
     clearTimers();
     setStatus('WAITING');
+    isAuthenticated = false;
 
-    socket = new WebSocket(WS_ENDPOINT);
+    chrome.storage.sync.get({ bridgeAuthToken: '' }, (data) => {
+        bridgeAuthToken = sanitizeToken(data.bridgeAuthToken);
+        socket = new WebSocket(getSocketEndpoint());
 
-    socket.onopen = () => {
-        isConnected = true;
-        isConnecting = false;
-        console.log('[Extension] Connected to Electron app');
-        resetRecovery();
-        setStatus('CONNECTED');
-        armHeartbeat();
-        // Immediately check tab after connection
-        setTimeout(checkTabStatus, 500);
-    };
+        socket.onopen = () => {
+            isConnecting = false;
+            console.log('[Extension] Connected to Electron app socket');
+            setStatus('WAITING');
+        };
 
-    socket.onmessage = (event) => {
-        try {
-            const message = JSON.parse(event.data);
+        socket.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
 
-            // Handle app status updates (visibility, etc)
-            if (message.type === 'app') {
-                lastAppStatus.windowVisible = message.windowVisible;
-                chrome.runtime.sendMessage({ type: 'app', v: 1, windowVisible: message.windowVisible }).catch(() => { });
-                return;
-            }
-
-            if (message.type === 'pong') {
-                clearTimeout(heartbeatTimeout);
-                return;
-            }
-
-            // Relay commands from Electron to YTM tabs
-            if (message.type === 'cmd') {
-                console.log(`[Extension] [ID:${message.id || 'N/A'}] Relaying CMD: ${message.cmd}`);
-            }
-
-            chrome.tabs.query({ url: '*://music.youtube.com/*' }, (tabs) => {
-                if (tabs.length > 0) {
-                    tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, message));
-                } else {
-                    if (message.type === 'cmd') console.warn(`[Extension] [ID:${message.id || 'N/A'}] Drop: No YTM Tab`);
-                    chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'Need YTM Tab' }).catch(() => { });
+                if (message.type === 'auth-request') {
+                    isConnected = false;
+                    setStatus('AUTH_REQUIRED');
+                    chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'AUTH_REQUIRED' }).catch(() => { });
+                    if (!manualDisconnect && autoConnect) {
+                        socket.close();
+                    }
+                    return;
                 }
-            });
-        } catch (e) {
-            console.error('[Extension] Failed to parse message:', e);
-        }
-    };
 
-    socket.onclose = () => {
-        isConnected = false;
-        isConnecting = false;
-        socket = null;
-        clearTimers();
-        setStatus('OFFLINE');
+                if (message.type === 'auth-ok') {
+                    isAuthenticated = true;
+                    isConnected = true;
+                    resetRecovery();
+                    console.log('[Extension] Bridge auth succeeded');
+                    setStatus('CONNECTED');
+                    armHeartbeat();
+                    // Immediately check tab after connection
+                    setTimeout(checkTabStatus, 500);
+                    return;
+                }
 
-        if (autoConnect) {
-            scheduleReconnect();
-        }
-    };
+                if (message.type === 'auth-error') {
+                    isAuthenticated = false;
+                    isConnected = false;
+                    const reason = message.reason || 'unauthorized';
+                    console.error('[Extension] Bridge auth error:', reason);
+                    setStatus(`AUTH_FAIL(${reason})`);
+                    chrome.runtime.sendMessage({ type: 'status', v: 1, msg: reason }).catch(() => { });
+                    socket.close();
+                    return;
+                }
 
-    socket.onerror = (err) => {
-        isConnecting = false;
-        console.error('[YTMamp] Socket error:', err && err.message ? err.message : err);
-        if (autoConnect && !manualDisconnect) {
-            scheduleReconnect();
-        }
-    };
+                if (!isAuthenticated) {
+                    isAuthenticated = true;
+                    isConnected = true;
+                    resetRecovery();
+                    console.log('[Extension] Bridge connected without auth');
+                    setStatus('CONNECTED');
+                    armHeartbeat();
+                }
+
+                // Handle app status updates (visibility, etc)
+                if (message.type === 'app') {
+                    lastAppStatus.windowVisible = message.windowVisible;
+                    chrome.runtime.sendMessage({ type: 'app', v: 1, windowVisible: message.windowVisible }).catch(() => { });
+                    return;
+                }
+
+                if (message.type === 'pong') {
+                    clearTimeout(heartbeatTimeout);
+                    return;
+                }
+
+                // Relay commands from Electron to YTM tabs
+                if (message.type === 'cmd') {
+                    console.log(`[Extension] [ID:${message.id || 'N/A'}] Relaying CMD: ${message.cmd}`);
+                }
+
+                chrome.tabs.query({ url: '*://music.youtube.com/*' }, (tabs) => {
+                    if (tabs.length > 0) {
+                        tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, message));
+                    } else {
+                        if (message.type === 'cmd') console.warn(`[Extension] [ID:${message.id || 'N/A'}] Drop: No YTM Tab`);
+                        chrome.runtime.sendMessage({ type: 'status', v: 1, msg: 'Need YTM Tab' }).catch(() => { });
+                    }
+                });
+            } catch (e) {
+                console.error('[Extension] Failed to parse message:', e);
+            }
+        };
+
+        socket.onclose = () => {
+            isAuthenticated = false;
+            isConnected = false;
+            isConnecting = false;
+            socket = null;
+            clearTimers();
+            setStatus('OFFLINE');
+
+            if (autoConnect) {
+                scheduleReconnect();
+            }
+        };
+
+        socket.onerror = (err) => {
+            isConnecting = false;
+            console.error('[YTMamp] Socket error:', err && err.message ? err.message : err);
+            if (autoConnect && !manualDisconnect) {
+                scheduleReconnect();
+            }
+        };
+    });
 }
 
 // Global listeners (outside setupWebSocket)
@@ -249,6 +308,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         clearTimers();
         chrome.storage.sync.set({ autoConnect: false });
         if (socket) socket.close();
+        return;
+    }
+
+    if (message.type === 'set_bridge_token') {
+        bridgeAuthToken = sanitizeToken(message.token);
+        chrome.storage.sync.set({ bridgeAuthToken }, () => {
+            if (autoConnect) {
+                manualDisconnect = false;
+                resetRecovery();
+                setupWebSocket();
+            }
+        });
         return;
     }
 

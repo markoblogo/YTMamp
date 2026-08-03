@@ -2,6 +2,7 @@ const { WebSocketServer } = require('ws');
 
 const OPEN = 1;
 const KNOWN_MESSAGE_TYPES = new Set([
+    'auth',
     'ping',
     'cmd',
     'event',
@@ -29,6 +30,10 @@ const KNOWN_COMMANDS = new Set([
 ]);
 const KNOWN_SETTINGS = new Set(['startAtLogin', 'autoShowOnPlay']);
 
+function isString(value, maxLength = 1024) {
+    return typeof value === 'string' && value.length <= maxLength;
+}
+
 function clampString(value, fallback = '', max = 300) {
     if (typeof value !== 'string') return fallback;
     return value.replace(/\s+/g, ' ').trim().slice(0, max) || fallback;
@@ -49,6 +54,10 @@ function sanitizeTrackMessage(message) {
 function validateMessage(message) {
     if (!message || typeof message !== 'object') return false;
     if (message.v !== 1 || !KNOWN_MESSAGE_TYPES.has(message.type)) return false;
+
+    if (message.type === 'auth') {
+        return isString(message.token, 512);
+    }
 
     if (message.type === 'cmd') {
         if (!KNOWN_COMMANDS.has(message.cmd)) return false;
@@ -92,17 +101,39 @@ function parseMessage(data) {
     return validateMessage(message) ? message : null;
 }
 
+function parseClientToken(req) {
+    if (!req || !req.url) return '';
+    try {
+        const url = new URL(req.url, `ws://${req.headers.host || '127.0.0.1'}`);
+        return url.searchParams.get('token') || '';
+    } catch (error) {
+        return '';
+    }
+}
+
+function sanitizeToken(value) {
+    return isString(value, 512) ? value.trim() : '';
+}
+
 function createBridgeServer(options) {
     const {
         WebSocketServerImpl = WebSocketServer,
         host = '127.0.0.1',
         port = 18765,
         maxBackoffMs = 30000,
+        allowUnauthenticated = true,
+        expectedAuthToken = '',
+        authTimeoutMs = 5000,
         onConnection = () => { },
+        onAuth = () => { },
         onMessage = () => { },
         onStatus = () => { },
         onError = () => { }
     } = options || {};
+
+    const trimmedExpectedToken = sanitizeToken(expectedAuthToken);
+    const hasExpectedToken = Boolean(trimmedExpectedToken);
+    const authEnabled = hasExpectedToken && !allowUnauthenticated;
 
     let server = null;
     let activeClient = null;
@@ -127,8 +158,32 @@ function createBridgeServer(options) {
     }
 
     function cleanupClient(ws) {
+        if (ws && ws.__ytmampAuthTimer) {
+            clearTimeout(ws.__ytmampAuthTimer);
+            ws.__ytmampAuthTimer = null;
+        }
         clients.delete(ws);
         if (activeClient === ws) activeClient = null;
+    }
+
+    function activateClient(ws, req) {
+        if (ws.__ytmampAuthTimer) {
+            clearTimeout(ws.__ytmampAuthTimer);
+            ws.__ytmampAuthTimer = null;
+        }
+
+        if (ws.__ytmampAuthed) return;
+        ws.__ytmampAuthed = true;
+        activeClient = ws;
+        onAuth('ok', ws);
+        onConnection(ws, req);
+    }
+
+    function requireAuth(ws, req, reason) {
+        const message = { type: 'auth-error', v: 1, reason };
+        send(ws, message);
+        onAuth('invalid', ws, reason);
+        ws.close(4003, 'unauthorized');
     }
 
     function scheduleRestart() {
@@ -138,6 +193,28 @@ function createBridgeServer(options) {
             start();
         }, restartDelayMs);
         restartDelayMs = Math.min(restartDelayMs * 2, maxBackoffMs);
+    }
+
+    function finalizeHandshake(ws, req) {
+        if (!authEnabled) {
+            activeClient = ws;
+            onConnection(ws, req);
+            return;
+        }
+
+        const token = parseClientToken(req);
+        if (token && token === trimmedExpectedToken) {
+            send(ws, { type: 'auth-ok', v: 1 });
+            activateClient(ws, req);
+            return;
+        }
+
+        send(ws, { type: 'auth-request', v: 1 });
+        ws.__ytmampAuthTimer = setTimeout(() => {
+            if (!ws.__ytmampAuthed) {
+                requireAuth(ws, req, 'auth timeout');
+            }
+        }, authTimeoutMs);
     }
 
     function start() {
@@ -152,12 +229,28 @@ function createBridgeServer(options) {
 
         server.on('connection', (ws, req) => {
             clients.add(ws);
-            activeClient = ws;
-            onConnection(ws, req);
+            ws.__ytmampAuthed = false;
+            ws.__ytmampAuthTimer = null;
+            finalizeHandshake(ws, req);
 
             ws.on('message', (data) => {
                 const message = parseMessage(data);
                 if (!message) return;
+                if (!ws.__ytmampAuthed && authEnabled) {
+                    if (message.type === 'auth') {
+                        if (isString(message.token, 512) && message.token === trimmedExpectedToken) {
+                            send(ws, { type: 'auth-ok', v: 1 });
+                            activateClient(ws, req);
+                            return;
+                        }
+                        onAuth('invalid', ws);
+                        requireAuth(ws, req, 'invalid token');
+                        return;
+                    }
+
+                    requireAuth(ws, req, 'auth required');
+                    return;
+                }
                 onMessage(message, ws);
             });
 

@@ -1,19 +1,23 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 
 let mainWindow;
 let tray;
 let bridge;
 let isQuitting = false;
+const localTrustEnabled = ['1', 'true', 'yes', 'on'].includes((process.env.LOCAL_TRUST || '').toLowerCase());
+const envBridgeToken = (process.env.BRIDGE_TOKEN || '').trim();
 
 // --- Settings Persistence ---
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings = {
     startAtLogin: false,
     autoShowOnPlay: true,
-    windowBounds: null
+    windowBounds: null,
+    bridgeAuthToken: ''
 };
 
 function loadSettings() {
@@ -23,6 +27,7 @@ function loadSettings() {
             settings = { ...settings, ...JSON.parse(data) };
             settings.startAtLogin = typeof settings.startAtLogin === 'boolean' ? settings.startAtLogin : !!settings.startAtLogin;
             settings.autoShowOnPlay = typeof settings.autoShowOnPlay === 'boolean' ? settings.autoShowOnPlay : true;
+            settings.bridgeAuthToken = (typeof settings.bridgeAuthToken === 'string' && settings.bridgeAuthToken.length <= 512) ? settings.bridgeAuthToken : '';
             if (settings.windowBounds && (typeof settings.windowBounds.x !== 'number' || typeof settings.windowBounds.y !== 'number')) {
                 settings.windowBounds = null;
             }
@@ -127,6 +132,19 @@ function saveWindowBounds() {
     const bounds = mainWindow.getBounds();
     settings.windowBounds = { x: bounds.x, y: bounds.y };
     saveSettings();
+}
+
+function sanitizeToken(value) {
+    return typeof value === 'string' ? value.trim().slice(0, 512) : '';
+}
+
+function getExpectedAuthToken() {
+    if (envBridgeToken) return envBridgeToken;
+    if (settings.bridgeAuthToken) return settings.bridgeAuthToken;
+    const generated = crypto.randomBytes(24).toString('hex');
+    settings.bridgeAuthToken = generated;
+    saveSettings();
+    return generated;
 }
 
 function createWindow() {
@@ -248,6 +266,9 @@ function setupWebSocket() {
     bridge = createBridgeServer({
         port: 18765,
         host: '127.0.0.1',
+        allowUnauthenticated: localTrustEnabled,
+        expectedAuthToken: localTrustEnabled ? '' : getExpectedAuthToken(),
+        authTimeoutMs: 7000,
         onStatus: (status) => {
             if (status === 'listening') console.log('[WS] Server started on ws://127.0.0.1:18765');
         },

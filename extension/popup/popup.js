@@ -9,15 +9,18 @@ const btnDisconnect = document.getElementById('btn-disconnect');
 const btnInstall = document.getElementById('btn-install');
 const checkAuto = document.getElementById('check-auto');
 const checkAutoShow = document.getElementById('check-autoshow');
+const bridgeTokenInput = document.getElementById('bridge-token');
+const btnSaveToken = document.getElementById('btn-save-token');
 
 function updateUI() {
     chrome.runtime.sendMessage({ type: 'get_status' }, (response) => {
         if (!response) return;
 
         // Load sync settings
-        chrome.storage.sync.get({ autoConnect: true, autoShow: true }, (data) => {
+        chrome.storage.sync.get({ autoConnect: true, autoShow: true, bridgeAuthToken: '' }, (data) => {
             checkAuto.checked = data.autoConnect;
             checkAutoShow.checked = data.autoShow;
+            bridgeTokenInput.value = data.bridgeAuthToken || '';
         });
 
         if (response.connected) {
@@ -90,6 +93,10 @@ btnConnect.onclick = () => {
 btnDisconnect.onclick = () => {
     chrome.runtime.sendMessage({ type: 'manual_disconnect' });
     updateUI();
+};
+
+btnSaveToken.onclick = () => {
+    chrome.runtime.sendMessage({ type: 'set_bridge_token', token: bridgeTokenInput.value });
 };
 
 btnInstall.onclick = () => {
