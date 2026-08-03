@@ -2,9 +2,10 @@
 
 YTMamp exposes a local HTTP API for external integrations (obsidian tools, scripts, widgets).
 
-- Host: `127.0.0.1`
+- Host: `0.0.0.0` by default (bind is LAN-visible; use `INTEGRATION_HOST` to override)
 - Default port: `18880`
 - Env vars:
+  - `INTEGRATION_HOST` — override bind host (default `0.0.0.0`)
   - `INTEGRATION_PORT` — override listening port (default `18880`)
   - `INTEGRATION_TOKEN` — optional shared token (`Bearer`, `X-YTMAMP-Token`, or `?token=...`)
   - `OBS_ORIGIN_ALLOWLIST` — comma-separated origins allowed to call `/obs` (for example `http://localhost:4455,https://studio.example.com`). Empty means deny all non-empty origins.
@@ -220,6 +221,105 @@ Allowed response headers for valid OBS calls:
 - Payload formats for `track` and `state` follow normalized player payloads used by UI/plugin runtime.
 - `/status`, `/current-track`, `/events` do not set browser CORS headers.
 - `/obs` sets CORS headers only for allowed origins from `OBS_ORIGIN_ALLOWLIST`.
+
+## Cardputer cast control (`/api/cast/*`)
+
+New minimal endpoints designed for local Wi‑Fi remote control without external auth at launch.
+
+### `GET /api/cast/status`
+
+Returns current playback snapshot for lightweight controllers (Cardputer, ESP, etc.).
+
+```bash
+curl -s "http://<PC_IP>:18880/api/cast/status"
+```
+
+**Success (active track)**
+
+```json
+{
+  "ok": true,
+  "state": "playing",
+  "source": "ytmamp",
+  "track": {
+    "title": "Unknown",
+    "artist": "Artist",
+    "album": "Album",
+    "track_id": "",
+    "duration_ms": 240000,
+    "position_ms": 120000
+  },
+  "time": 1722500000000
+}
+```
+
+**No track**
+
+```json
+{ "ok": false, "state": "stopped", "source": "ytmamp", "error": "no_active_track" }
+```
+
+### `POST /api/cast/cmd`
+
+Send commands:
+
+- `play`, `pause`, `toggle`, `stop`, `next`, `prev`
+
+```bash
+curl -X POST "http://<PC_IP>:18880/api/cast/cmd" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"toggle"}'
+```
+
+**Success response**
+
+```json
+{
+  "ok": true,
+  "state": "playing",
+  "source": "ytmamp",
+  "track": {
+    "title": "Unknown",
+    "artist": "Artist",
+    "album": "Album",
+    "track_id": "",
+    "duration_ms": 240000,
+    "position_ms": 120000
+  },
+  "time": 1722500000000
+}
+```
+
+**Error response**
+
+```json
+{ "ok": false, "state": "error", "source": "ytmamp", "error": "no_active_track" }
+```
+
+Response headers for valid calls include:
+
+- `content-type: application/json; charset=utf-8`
+- `cache-control: no-store`
+- `x-ytmamp-api-version: 1`
+- `access-control-allow-origin: *` (or request `Origin` for browser clients)
+
+CORS preflight:
+
+```bash
+curl -X OPTIONS "http://<PC_IP>:18880/api/cast/cmd" \
+  -H "Origin: http://cardputer.local" \
+  -H "Access-Control-Request-Method: POST"
+```
+
+### Cardputer integration flow (MVP)
+
+1. Discover/set PC IPv4 in Cardputer network settings.
+2. Poll `GET /api/cast/status` on interval (for example every 2–3s) and render `track`.
+3. On hardware buttons, send `POST /api/cast/cmd` with JSON action:
+   - Next: `{"action":"next"}`
+   - Prev: `{"action":"prev"}`
+   - Play/pause toggle: `{"action":"toggle"}`
+4. Retry on non-200 statuses with a short backoff and restore polling.
 
 ## Last.fm scrobbling (S2-02)
 
