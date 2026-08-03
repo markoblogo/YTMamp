@@ -146,3 +146,26 @@ data: {"type":"state","v":1,"payload":{...}}
 - `status` values are forwarded from bridge/app internals.
 - Payload formats for `track` and `state` follow normalized player payloads used by UI/plugin runtime.
 - No CORS/CSP headers are set in v1.
+
+## Last.fm scrobbling (S2-02)
+
+YTMamp can emit Last.fm now-playing + scrobble events for local playback.
+
+Configuration (desktop env vars):
+
+- `LASTFM_ENABLED` — force enable (`1/true/yes/on`).
+- `LASTFM_API_KEY` — Last.fm API key.
+- `LASTFM_API_SECRET` — Last.fm API secret.
+- `LASTFM_SESSION_KEY` — active Last.fm session key.
+- `LASTFM_TRACK_THRESHOLD_SEC` — scrobble threshold, default `240`.
+- `LASTFM_MIN_TRACK_DURATION_SEC` — minimum duration gate, default `30`.
+- `LASTFM_PROCESS_INTERVAL_MS` — queue poll interval.
+- `LASTFM_RETRY_BASE_MS` — base retry delay for transient failures.
+- `LASTFM_RETRY_MAX_MS` — upper bound for exponential backoff.
+
+Behavior:
+
+- On track switch: `track.updateNowPlaying` is queued.
+- On track progress: scrobble is queued when effective play threshold is reached.
+- On stop/track change and on app shutdown: queue persists to `lastfm-scrobble-queue.json` under `userData`.
+- Retry policy: retry on network/429/5xx with exponential backoff; hard failures drop from queue.

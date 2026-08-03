@@ -7,6 +7,7 @@ const { URL } = require('url');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 const { createEventBus } = require('./event_bus');
 const { createPluginRuntime } = require('./plugin_runtime');
+const { createLastFmScrobbler, DEFAULT_TRACK_THRESHOLD_SEC, DEFAULT_MIN_TRACK_DURATION_SEC } = require('./integrations/lastfm');
 const {
     INTEGRATION_API_VERSION,
     getRequestedIntegrationApiVersion,
@@ -20,6 +21,7 @@ let tray;
 let bridge;
 let isQuitting = false;
 let pluginRuntime;
+let lastfmScrobbler;
 const pluginRuntimeStatusQueue = [];
 const pluginRuntimeUiQueue = [];
 const playerStateBus = createEventBus({ dedupeWindowMs: 350 });
@@ -32,6 +34,9 @@ const stateEventDedupWindowMs = 350;
 const localTrustEnabled = ['1', 'true', 'yes', 'on'].includes((process.env.LOCAL_TRUST || '').toLowerCase());
 const envBridgeToken = (process.env.BRIDGE_TOKEN || '').trim();
 const integrationEnvToken = (process.env.INTEGRATION_TOKEN || '').trim();
+const LASTFM_ENABLED = ['1', 'true', 'yes', 'on'].includes((process.env.LASTFM_ENABLED || '').toLowerCase());
+const LASTFM_TRACK_THRESHOLD_SEC = Number.parseInt(process.env.LASTFM_TRACK_THRESHOLD_SEC || '', 10) || DEFAULT_TRACK_THRESHOLD_SEC;
+const LASTFM_MIN_TRACK_DURATION_SEC = Number.parseInt(process.env.LASTFM_MIN_TRACK_DURATION_SEC || '', 10) || DEFAULT_MIN_TRACK_DURATION_SEC;
 const INTEGRATION_HOST = '127.0.0.1';
 const INTEGRATION_PORT = Number(process.env.INTEGRATION_PORT) || 18880;
 const RATE_LIMIT_WINDOW_MS = 1000;
@@ -83,6 +88,9 @@ playerStateBus.on('track', (payload) => {
         mainWindow.webContents.send('track-update', payload);
     }
     broadcastIntegrationEvent('track', payload);
+    if (lastfmScrobbler) {
+        lastfmScrobbler.handleTrack(payload);
+    }
 });
 
 playerStateBus.on('state', (payload) => {
@@ -90,7 +98,51 @@ playerStateBus.on('state', (payload) => {
         mainWindow.webContents.send('state-update', payload);
     }
     broadcastIntegrationEvent('state', payload);
+    if (lastfmScrobbler) {
+        lastfmScrobbler.handleState(payload);
+    }
 });
+
+function parseEnvInt(value, fallback) {
+    const parsed = Number.parseInt(value || '', 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function setupLastFmScrobbling() {
+    const apiKey = (process.env.LASTFM_API_KEY || '').trim();
+    const apiSecret = (process.env.LASTFM_API_SECRET || '').trim();
+    const sessionKey = (process.env.LASTFM_SESSION_KEY || '').trim();
+
+    if (!LASTFM_ENABLED && !(apiKey && apiSecret && sessionKey)) {
+        console.log('[LastFM] Disabled (missing env config)');
+        return;
+    }
+
+    const queueStoragePath = path.join(app.getPath('userData'), 'lastfm-scrobble-queue.json');
+    lastfmScrobbler = createLastFmScrobbler({
+        enabled: true,
+        apiKey,
+        apiSecret,
+        sessionKey,
+        thresholdSec: parseEnvInt(process.env.LASTFM_TRACK_THRESHOLD_SEC, LASTFM_TRACK_THRESHOLD_SEC),
+        minDurationSec: parseEnvInt(process.env.LASTFM_MIN_TRACK_DURATION_SEC, LASTFM_MIN_TRACK_DURATION_SEC),
+        processIntervalMs: parseEnvInt(process.env.LASTFM_PROCESS_INTERVAL_MS, 1500),
+        baseRetryMs: parseEnvInt(process.env.LASTFM_RETRY_BASE_MS, 5000),
+        maxRetryMs: parseEnvInt(process.env.LASTFM_RETRY_MAX_MS, 120000),
+        queueStoragePath,
+        logger: {
+            debug: (...args) => console.debug('[LastFM]', ...args),
+            info: (...args) => console.info('[LastFM]', ...args),
+            warn: (...args) => console.warn('[LastFM]', ...args),
+            error: (...args) => console.error('[LastFM]', ...args)
+        }
+    });
+
+    if (lastfmScrobbler) {
+        lastfmScrobbler.start();
+        console.log('[LastFM] Scrobbling enabled');
+    }
+}
 
 function parseRemoteIp(req) {
     const raw = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : '';
@@ -779,6 +831,7 @@ app.whenReady().then(() => {
     loadSettings();
     applyAutostart();
     setupPlugins();
+    setupLastFmScrobbling();
     createWindow();
     createTray();
     setupIpc();
@@ -797,6 +850,9 @@ app.on('window-all-closed', function () {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (lastfmScrobbler) {
+        lastfmScrobbler.stop();
+    }
     if (integrationServer) {
         for (const client of integrationSseClients) {
             try {
