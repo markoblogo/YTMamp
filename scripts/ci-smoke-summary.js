@@ -9,11 +9,13 @@ const summaryPath = path.join(appDir, 'ci-smoke-summary.md');
 const outputPath = path.join(appDir, 'ci-smoke-output.log');
 
 const isWindows = process.platform === 'win32';
-const shell = isWindows ? 'cmd' : 'sh';
-const shellArgs = isWindows ? ['/d', '/c', 'npm test'] : ['-lc', 'npm test'];
-const testResult = spawnSync(shell, shellArgs, {
+const testCommand = isWindows ? 'npm.cmd' : 'npm';
+const testArgs = ['test'];
+const testResult = spawnSync(testCommand, testArgs, {
     cwd: appDir,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    timeout: 10 * 60 * 1000,
+    maxBuffer: 10 * 1024 * 1024
 });
 
 const stdout = testResult.stdout || '';
@@ -29,7 +31,7 @@ const failed = lines.filter((line) => line.includes('not ok')).length;
 const summary = [
     '# Smoke integration check',
     '',
-    `Run: \`${process.platform} - node test runner\``,
+    `Run: \`${isWindows ? 'npm.cmd' : 'npm'} test\``,
     `Result: ${status === 0 ? 'PASS' : 'FAIL'}`,
     `Exit code: ${status}`,
     '',
@@ -56,7 +58,7 @@ const summary = [
     '',
     '### Raw output tail',
     '```',
-    ...lines.slice(-30),
+    ...lines.slice(-50),
     '```'
 ].join('\n');
 
@@ -67,6 +69,14 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 }
 
 if (status !== 0) {
+    if (testResult.error) {
+        console.error('[CI] Test process spawn error:', testResult.error.message);
+    }
+    console.error('[CI] Smoke tests failed with code:', status);
+    const tail = lines.slice(-40).join('\n');
+    if (tail) {
+        console.error('[CI] Smoke test output tail:\n' + tail);
+    }
     console.error('[CI] Smoke tests failed');
     process.exit(status);
 }
