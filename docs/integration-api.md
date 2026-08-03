@@ -151,6 +151,17 @@ data: {"type":"state","v":1,"payload":{...}}
 | `/events` token mismatch | `401` | `x-ytmamp-api-version: 1`, `www-authenticate: Bearer realm="ytmamp-local"` | `unauthorized` |
 | `/events` unsupported API version | `400` | `x-ytmamp-api-version: 1`, `content-type: application/json; charset=utf-8`, `cache-control: no-store` | `{"v":1,"error":"UNSUPPORTED_API_VERSION",...}` |
 | `/events` rate limit exceeded | `429` | `x-ytmamp-api-version: 1`, `content-type: text/plain; charset=utf-8`, `retry-after: <seconds>` | `rate limit exceeded` |
+| `/status` success | `200` | `content-type: application/json; charset=utf-8`, `x-ytmamp-api-version: 1`, `cache-control: no-store` | canonical status payload (`v,status,track,state,updatedAt,windowVisible`) |
+| `/status` non-local request | `403` | `x-ytmamp-api-version: 1`, `content-type: text/plain; charset=utf-8` | `forbidden` |
+| `/status` token mismatch | `401` | `x-ytmamp-api-version: 1`, `www-authenticate: Bearer realm="ytmamp-local"` | `unauthorized` |
+| `/status` unsupported API version | `400` | `x-ytmamp-api-version: 1`, `content-type: application/json; charset=utf-8`, `cache-control: no-store` | `{"v":1,"error":"UNSUPPORTED_API_VERSION",...}` |
+| `/status` rate limit exceeded | `429` | `x-ytmamp-api-version: 1`, `content-type: text/plain; charset=utf-8`, `retry-after: <seconds>` | `rate limit exceeded` |
+| `/current-track` active track | `200` | `content-type: application/json; charset=utf-8`, `x-ytmamp-api-version: 1`, `cache-control: no-store` | canonical status payload |
+| `/current-track` no track | `204` | `x-ytmamp-api-version: 1`, `cache-control: no-store` | no body |
+| `/current-track` non-local request | `403` | `x-ytmamp-api-version: 1`, `content-type: text/plain; charset=utf-8` | `forbidden` |
+| `/current-track` token mismatch | `401` | `x-ytmamp-api-version: 1`, `www-authenticate: Bearer realm="ytmamp-local"` | `unauthorized` |
+| `/current-track` unsupported API version | `400` | `x-ytmamp-api-version: 1`, `content-type: application/json; charset=utf-8`, `cache-control: no-store` | `{"v":1,"error":"UNSUPPORTED_API_VERSION",...}` |
+| `/current-track` rate limit exceeded | `429` | `x-ytmamp-api-version: 1`, `content-type: text/plain; charset=utf-8`, `retry-after: <seconds>` | `rate limit exceeded` |
 ### `GET /obs`
 
 OBS overlay endpoint with explicit allowlist/CORS policy and minimal payload:
