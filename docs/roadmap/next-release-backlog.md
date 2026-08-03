@@ -5,6 +5,16 @@
 ## Цель релиза
 Выпустить платформенный шаг: core-договор + безопасность bridge + событийная шина + плагинная платформа MVP.
 
+## Финальный статус релиза (v0.3.3 freeze)
+
+- [x] S2-01 Локальный integration API (`/status`, `/current-track`, SSE/WS)
+- [x] S2-02 Last.fm scrobbling
+- [x] S2-04 OBS overlay endpoint
+- [ ] S2-03 Discord Rich Presence — **вне скоупа release (исключено по решению владельца)**
+- [ ] S2-05 Профили, hotkeys, tray actions — **перенесено в следующий цикл**
+- [x] CI: добавлены smoke/contract чеклисты для `/status`, `/current-track`, `/events`, `/obs`
+- [x] Windows CI-инфраструктурный падение smoke устранено и подтверждено
+
 ## Sprint 1 — Фундамент
 
 ### S1-01 Core contracts: выделить shared protocol/events/state в core-пакет
