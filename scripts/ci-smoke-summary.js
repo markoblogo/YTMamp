@@ -8,8 +8,10 @@ const appDir = path.join(repoRoot, 'app');
 const summaryPath = path.join(appDir, 'ci-smoke-summary.md');
 const outputPath = path.join(appDir, 'ci-smoke-output.log');
 
-const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const testResult = spawnSync(npmCmd, ['test'], {
+const isWindows = process.platform === 'win32';
+const shell = isWindows ? 'cmd' : 'sh';
+const shellArgs = isWindows ? ['/d', '/c', 'npm test'] : ['-lc', 'npm test'];
+const testResult = spawnSync(shell, shellArgs, {
     cwd: appDir,
     encoding: 'utf8'
 });
