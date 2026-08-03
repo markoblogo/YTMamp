@@ -7,6 +7,8 @@ const { URL } = require('url');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 const { createEventBus } = require('./event_bus');
 const { createPluginRuntime } = require('./plugin_runtime');
+require.extensions['.ts'] = require.extensions['.js'];
+const { createObsOverlayService } = require('./integrations/obs.ts');
 const { createLastFmScrobbler, DEFAULT_TRACK_THRESHOLD_SEC, DEFAULT_MIN_TRACK_DURATION_SEC } = require('./integrations/lastfm');
 const {
     INTEGRATION_API_VERSION,
@@ -34,6 +36,7 @@ const stateEventDedupWindowMs = 350;
 const localTrustEnabled = ['1', 'true', 'yes', 'on'].includes((process.env.LOCAL_TRUST || '').toLowerCase());
 const envBridgeToken = (process.env.BRIDGE_TOKEN || '').trim();
 const integrationEnvToken = (process.env.INTEGRATION_TOKEN || '').trim();
+const OBS_ORIGIN_ALLOWLIST = parseEnvOriginList(process.env.OBS_ORIGIN_ALLOWLIST || '');
 const LASTFM_ENABLED = ['1', 'true', 'yes', 'on'].includes((process.env.LASTFM_ENABLED || '').toLowerCase());
 const LASTFM_TRACK_THRESHOLD_SEC = Number.parseInt(process.env.LASTFM_TRACK_THRESHOLD_SEC || '', 10) || DEFAULT_TRACK_THRESHOLD_SEC;
 const LASTFM_MIN_TRACK_DURATION_SEC = Number.parseInt(process.env.LASTFM_MIN_TRACK_DURATION_SEC || '', 10) || DEFAULT_MIN_TRACK_DURATION_SEC;
@@ -46,6 +49,19 @@ let integrationServer;
 const integrationSseClients = new Set();
 const integrationRateBuckets = new Map();
 let appStatus = 'OFFLINE';
+const obsOverlay = createObsOverlayService({
+    allowlist: OBS_ORIGIN_ALLOWLIST,
+    logger: {
+        debug: (...args) => console.debug('[OBS]', ...args),
+        warn: (...args) => console.warn('[OBS]', ...args),
+        error: (...args) => console.error('[OBS]', ...args),
+        info: (...args) => console.info('[OBS]', ...args)
+    }
+});
+
+function parseEnvOriginList(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
 
 function notifyPlayerEvent(eventType, payload) {
     if (eventType === 'track') {
@@ -241,6 +257,11 @@ function setupIntegrationServer() {
         const integrationBaseHeaders = {
             'x-ytmamp-api-version': String(INTEGRATION_API_VERSION)
         };
+        const obsPayloadHeaders = {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'no-store',
+            ...integrationBaseHeaders
+        };
         try {
             if (!req.url) {
                 res.writeHead(400, integrationBaseHeaders);
@@ -324,6 +345,67 @@ function setupIntegrationServer() {
                 return;
             }
 
+            const obsOrigin = typeof req.headers.origin === 'string' ? req.headers.origin.trim() : '';
+            const isObsRequest = parsedUrl.pathname === '/obs';
+
+            if (isObsRequest && req.method === 'OPTIONS') {
+                if (!obsOverlay.isOriginAllowed(obsOrigin)) {
+                    res.writeHead(403, {
+                        ...integrationBaseHeaders,
+                        'content-type': 'text/plain; charset=utf-8'
+                    });
+                    res.end('forbidden');
+                    return;
+                }
+
+                const preflightHeaders = obsOverlay.getCorsHeaders(obsOrigin);
+                res.writeHead(204, {
+                    ...integrationBaseHeaders,
+                    'access-control-allow-methods': 'GET, OPTIONS',
+                    'access-control-allow-headers': 'Authorization, X-YTMAMP-Token, Content-Type',
+                    'access-control-max-age': '300',
+                    ...preflightHeaders
+                });
+                res.end();
+                return;
+            }
+
+            if (isObsRequest && req.method === 'GET') {
+                if (!obsOverlay.isOriginAllowed(obsOrigin)) {
+                    res.writeHead(403, {
+                        ...integrationBaseHeaders,
+                        'content-type': 'text/plain; charset=utf-8'
+                    });
+                    res.end('forbidden');
+                    return;
+                }
+
+                const payload = obsOverlay.buildPayload({
+                    track: playerState.track,
+                    state: playerState.state
+                });
+                if (!payload || !obsOverlay.isValidPayload(payload)) {
+                    res.writeHead(204, {
+                        ...integrationBaseHeaders,
+                        'cache-control': 'no-store'
+                    });
+                    res.end();
+                    return;
+                }
+
+                const headers = {
+                    ...obsPayloadHeaders,
+                    ...obsOverlay.getCorsHeaders(obsOrigin)
+                };
+                const responseBody = JSON.stringify(payload);
+                res.writeHead(200, {
+                    ...headers,
+                    'content-length': Buffer.byteLength(responseBody)
+                });
+                res.end(responseBody);
+                return;
+            }
+
             if (parsedUrl.pathname === '/events' && req.method === 'GET') {
                 if (integrationSseClients.size >= MAX_SSE_CLIENTS) {
                     res.writeHead(429, {
@@ -394,7 +476,7 @@ function setupIntegrationServer() {
 
     integrationServer.listen(INTEGRATION_PORT, INTEGRATION_HOST, () => {
         console.log(`[LocalAPI] listening on http://${INTEGRATION_HOST}:${INTEGRATION_PORT}`);
-        console.log('[LocalAPI] endpoints: /status, /current-track, /events');
+        console.log('[LocalAPI] endpoints: /status, /current-track, /events, /obs');
     });
 }
 

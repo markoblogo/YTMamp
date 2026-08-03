@@ -7,6 +7,7 @@ YTMamp exposes a local HTTP API for external integrations (obsidian tools, scrip
 - Env vars:
   - `INTEGRATION_PORT` — override listening port (default `18880`)
   - `INTEGRATION_TOKEN` — optional shared token (`Bearer`, `X-YTMAMP-Token`, or `?token=...`)
+  - `OBS_ORIGIN_ALLOWLIST` — comma-separated origins allowed to call `/obs` (for example `http://localhost:4455,https://studio.example.com`). Empty means deny all non-empty origins.
 
 ## Auth
 
@@ -141,11 +142,64 @@ event: state
 data: {"type":"state","v":1,"payload":{...}}
 ```
 
+### `GET /obs`
+
+OBS overlay endpoint with explicit allowlist/CORS policy and minimal payload:
+
+**Response payload schema**
+
+- `title` (string)
+- `artist` (string)
+- `cover` (string)
+- `position` (number, integer, seconds)
+- `likes` (number|null)
+
+**Rules**
+
+- Response includes only active track state, no nested session metadata.
+- Works on same auth/local checks as other endpoints, plus origin check from allowlist.
+- If active track is absent or invalid payload is produced, response is `204 No Content`.
+- Disallowed/unknown origin gets `403` and no JSON body.
+
+**Examples**
+
+```bash
+curl -H "Origin: https://studio.example.com" \
+  "http://127.0.0.1:18880/obs"
+
+curl -X OPTIONS \
+  -H "Origin: https://studio.example.com" \
+  -H "Access-Control-Request-Method: GET" \
+  "http://127.0.0.1:18880/obs"
+```
+
+**Example success response**
+
+```json
+{
+  "title": "Bohemian Rhapsody",
+  "artist": "Queen",
+  "cover": "https://example.com/cover.jpg",
+  "position": 183,
+  "likes": 12
+}
+```
+
+Allowed response headers for valid OBS calls:
+
+- `x-ytmamp-api-version: 1`
+- `access-control-allow-origin: <allowed-origin>`
+- `access-control-allow-credentials: true`
+- `vary: Origin`
+- standard `content-type: application/json; charset=utf-8`
+- standard `cache-control: no-store`
+
 ## Notes
 
 - `status` values are forwarded from bridge/app internals.
 - Payload formats for `track` and `state` follow normalized player payloads used by UI/plugin runtime.
-- No CORS/CSP headers are set in v1.
+- `/status`, `/current-track`, `/events` do not set browser CORS headers.
+- `/obs` sets CORS headers only for allowed origins from `OBS_ORIGIN_ALLOWLIST`.
 
 ## Last.fm scrobbling (S2-02)
 

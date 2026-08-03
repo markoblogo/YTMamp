@@ -9,7 +9,21 @@ const {
     validateIntegrationEventEnvelope
 } = require('../src/main/integration_api_contract');
 
-function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: overrideIsLocalRequest = null } = {}) {
+function parseCsvAllowlist(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+    return String(value).split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function isObsOriginAllowed(origin, allowlist) {
+    const normalized = typeof origin === 'string' ? origin.trim() : '';
+    if (!normalized) return true;
+    if (!allowlist.length) return false;
+    if (allowlist.includes('*')) return true;
+    return allowlist.includes(normalized);
+}
+
+function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: overrideIsLocalRequest = null, obsOriginAllowlist = [] } = {}) {
     const INTEGRATION_HOST = '127.0.0.1';
     const INTEGRATION_PORT = 18990;
     const MAX_SSE_CLIENTS = 2;
@@ -20,6 +34,7 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
     let state = null;
     let lastTs = 0;
     let appStatus = 'OFFLINE';
+    const obsAllowlist = parseCsvAllowlist(obsOriginAllowlist);
     const sseClients = new Set();
     const integrationRateBuckets = new Map();
 
@@ -93,6 +108,17 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
         res.end(json);
     }
 
+    function writeJsonResponse(res, statusCode, payload, extraHeaders = {}) {
+        const json = JSON.stringify(payload);
+        res.writeHead(statusCode, {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'no-store',
+            ...extraHeaders,
+            'content-length': Buffer.byteLength(json)
+        });
+        res.end(json);
+    }
+
     function writeSseEvent(res, payload) {
         if (!validateIntegrationEventEnvelope(payload)) return;
         const body = JSON.stringify(payload);
@@ -119,6 +145,7 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
         const query = parsedUrl.searchParams;
         const token = query.get('token');
         const apiVersion = getRequestedIntegrationApiVersion(query, req.headers);
+        const requestOrigin = typeof req.headers.origin === 'string' ? req.headers.origin.trim() : '';
 
         if (!isSupportedIntegrationApiVersion(apiVersion)) {
             res.writeHead(400, {
@@ -160,6 +187,60 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
 
         if (req.method === 'GET' && parsedUrl.pathname === '/status') {
             writePayloadResponse(res, 200, appPayload());
+            return;
+        }
+
+        if (parsedUrl.pathname === '/obs' && req.method === 'OPTIONS') {
+            if (!isObsOriginAllowed(requestOrigin, obsAllowlist)) {
+                res.writeHead(403, {
+                    ...integrationHeaders,
+                    'content-type': 'text/plain; charset=utf-8'
+                });
+                res.end('forbidden');
+                return;
+            }
+
+            res.writeHead(204, {
+                ...integrationHeaders,
+                'access-control-allow-origin': requestOrigin,
+                'access-control-allow-methods': 'GET, OPTIONS',
+                'access-control-allow-headers': 'Authorization, X-YTMAMP-Token, Content-Type',
+                'access-control-max-age': '300'
+            });
+            res.end();
+            return;
+        }
+
+        if (parsedUrl.pathname === '/obs' && req.method === 'GET') {
+            if (!isObsOriginAllowed(requestOrigin, obsAllowlist)) {
+                res.writeHead(403, {
+                    ...integrationHeaders,
+                    'content-type': 'text/plain; charset=utf-8'
+                });
+                res.end('forbidden');
+                return;
+            }
+
+            if (!track) {
+                res.writeHead(204, {
+                    ...integrationHeaders,
+                    'cache-control': 'no-store'
+                });
+                res.end();
+                return;
+            }
+
+            const payload = {
+                title: typeof track.title === 'string' ? track.title : '',
+                artist: typeof track.artist === 'string' ? track.artist : '',
+                cover: typeof track.cover === 'string' ? track.cover : '',
+                position: state && Number.isFinite(state.positionSec) ? Math.floor(state.positionSec) : 0,
+                likes: Number.isFinite(track.likes) ? track.likes : null
+            };
+            writeJsonResponse(res, 200, payload, {
+                ...integrationHeaders,
+                'access-control-allow-origin': requestOrigin
+            });
             return;
         }
 
@@ -220,6 +301,11 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
         lastTs = Date.now();
     }
 
+    function setState(value) {
+        state = value;
+        lastTs = Date.now();
+    }
+
     function setStatus(value) {
         appStatus = value;
     }
@@ -230,6 +316,7 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
         INTEGRATION_PORT,
         setTrack,
         setStatus,
+        setState
     };
 }
 
@@ -284,6 +371,28 @@ test('returns 200 /status with current API version and contract headers', async 
         await closeServer(fixture.server);
     }
 });
+
+async function requestStatusRaw({ serverUrl, path = '/status', headers = {}, method = 'GET' }) {
+    return await new Promise((resolve, reject) => {
+        const req = http.request(`${serverUrl}${path}`, {
+            method,
+            headers
+        }, (res) => {
+            let body = '';
+            res.setEncoding('utf8');
+            res.on('data', (chunk) => body += chunk);
+            res.on('end', () => {
+                resolve({
+                    statusCode: res.statusCode,
+                    headers: res.headers,
+                    body
+                });
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
 
 test('returns 204 for /current-track when absent and 200 when present', async () => {
     const fixture = createSmokeIntegrationServer();
@@ -423,6 +532,107 @@ test('streams snapshot on SSE events endpoint and exposes contract version heade
         assert.ok((headers['content-type'] || '').includes('text/event-stream'));
         assert.equal(headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
         assert.ok(body.includes('event: snapshot'));
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('returns minimal OBS overlay payload for allowed origin', async () => {
+    const fixture = createSmokeIntegrationServer({ obsOriginAllowlist: ['http://obs.client'] });
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        fixture.setTrack({
+            title: 'Track B',
+            artist: 'Artist B',
+            cover: 'https://cdn.example.com/cover.jpg',
+            likes: 77
+        });
+        fixture.setState({
+            positionSec: 12.7,
+            durationSec: 180,
+            playing: true
+        });
+
+        const response = await requestStatusRaw({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            path: '/obs',
+            headers: {
+                Origin: 'http://obs.client'
+            }
+        });
+
+        assert.equal(response.statusCode, 200);
+        assert.equal(response.headers['access-control-allow-origin'], 'http://obs.client');
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
+
+        const data = JSON.parse(response.body);
+        assert.deepEqual(Object.keys(data).sort(), ['artist', 'cover', 'likes', 'position', 'title']);
+        assert.equal(data.title, 'Track B');
+        assert.equal(data.artist, 'Artist B');
+        assert.equal(data.cover, 'https://cdn.example.com/cover.jpg');
+        assert.equal(data.position, 12);
+        assert.equal(data.likes, 77);
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('returns 403 for disallowed OBS overlay origin', async () => {
+    const fixture = createSmokeIntegrationServer({ obsOriginAllowlist: ['http://allowed.client'] });
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        const response = await requestStatusRaw({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            path: '/obs',
+            headers: {
+                Origin: 'http://evil.client'
+            }
+        });
+        assert.equal(response.statusCode, 403);
+        assert.equal(response.headers['x-ytmamp-api-version'], String(INTEGRATION_API_VERSION));
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('returns 204 for OBS overlay when track is absent', async () => {
+    const fixture = createSmokeIntegrationServer({ obsOriginAllowlist: ['http://obs.client'] });
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        const response = await requestStatusRaw({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            path: '/obs',
+            headers: {
+                Origin: 'http://obs.client'
+            }
+        });
+        assert.equal(response.statusCode, 204);
+        assert.equal(response.headers['access-control-allow-origin'], 'http://obs.client');
+    } finally {
+        await closeServer(fixture.server);
+    }
+});
+
+test('answers CORS preflight for OBS overlay', async () => {
+    const fixture = createSmokeIntegrationServer({ obsOriginAllowlist: ['http://obs.client'] });
+    await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
+
+    try {
+        const response = await requestStatusRaw({
+            serverUrl: `http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}`,
+            method: 'OPTIONS',
+            path: '/obs',
+            headers: {
+                Origin: 'http://obs.client',
+                'Access-Control-Request-Method': 'GET'
+            }
+        });
+        assert.equal(response.statusCode, 204);
+        assert.equal(response.headers['access-control-allow-origin'], 'http://obs.client');
+        assert.equal(response.headers['access-control-allow-methods'], 'GET, OPTIONS');
     } finally {
         await closeServer(fixture.server);
     }
