@@ -1,0 +1,7 @@
+{
+  "name": "track-logger",
+  "version": "0.1.0",
+  "enabled": true,
+  "entry": "track-logger.plugin.js",
+  "description": "Sample plugin for S1-04 runtime smoke test"
+}

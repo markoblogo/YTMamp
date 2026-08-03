@@ -4,11 +4,14 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 const { createEventBus } = require('./event_bus');
+const { createPluginRuntime } = require('./plugin_runtime');
 
 let mainWindow;
 let tray;
 let bridge;
 let isQuitting = false;
+let pluginRuntime;
+const pluginRuntimeStatusQueue = [];
 const playerStateBus = createEventBus({ dedupeWindowMs: 350 });
 const playerState = {
     track: null,
@@ -194,6 +197,56 @@ function sanitizeToken(value) {
     return typeof value === 'string' ? value.trim().slice(0, 512) : '';
 }
 
+function getPluginDirectories() {
+    const candidates = [
+        path.join(app.getPath('userData'), 'plugins'),
+        path.join(app.getAppPath(), 'plugins')
+    ];
+    return Array.from(new Set(candidates));
+}
+
+function emitPluginStatus(status) {
+    if (!mainWindow) return;
+    mainWindow.webContents.send('plugin-status', status);
+}
+
+function queuePluginStatus(status) {
+    if (!mainWindow) {
+        pluginRuntimeStatusQueue.push(status);
+        return;
+    }
+    emitPluginStatus(status);
+}
+
+function flushPluginStatusQueue() {
+    while (pluginRuntimeStatusQueue.length) {
+        emitPluginStatus(pluginRuntimeStatusQueue.shift());
+    }
+}
+
+function setupPlugins() {
+    pluginRuntime = createPluginRuntime({
+        eventBus: playerStateBus,
+        searchDirectories: getPluginDirectories(),
+        logger: {
+            info: (...args) => console.log('[Plugins]', ...args),
+            warn: (...args) => console.warn('[Plugins]', ...args),
+            error: (...args) => console.error('[Plugins]', ...args),
+            debug: (...args) => console.debug('[Plugins]', ...args)
+        },
+        onPluginStatus: (status) => {
+            queuePluginStatus(status);
+            if (status.status === 'failed') {
+                console.error(`[Plugins] ${status.name}: ${status.reason || 'failed'}`);
+            } else {
+                console.log(`[Plugins] ${status.name}: ${status.status}`);
+            }
+        }
+    });
+
+    pluginRuntime.init();
+}
+
 function getExpectedAuthToken() {
     if (envBridgeToken) return envBridgeToken;
     if (settings.bridgeAuthToken) return settings.bridgeAuthToken;
@@ -230,6 +283,15 @@ function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
         broadcastVisibility();
+        if (pluginRuntime) {
+            pluginRuntime.getStatusSnapshot().forEach((status) => {
+                emitPluginStatus({
+                    ...status,
+                    status: status.status || 'active'
+                });
+            });
+        }
+        flushPluginStatusQueue();
     });
 
     mainWindow.on('show', () => {
@@ -408,6 +470,7 @@ function setupIpc() {
 app.whenReady().then(() => {
     loadSettings();
     applyAutostart();
+    setupPlugins();
     createWindow();
     createTray();
     setupIpc();
@@ -427,4 +490,5 @@ app.on('before-quit', () => {
     isQuitting = true;
     if (bridge) bridge.stop();
     if (tray) tray.destroy();
+    if (pluginRuntime) pluginRuntime.unload();
 });

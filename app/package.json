@@ -117,6 +117,7 @@
     "files": [
       "src/**/*",
       "renderer/**/*",
+      "plugins/**/*",
       "package.json",
       "assets/**/*"
     ],
