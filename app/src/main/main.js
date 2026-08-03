@@ -7,6 +7,13 @@ const { URL } = require('url');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 const { createEventBus } = require('./event_bus');
 const { createPluginRuntime } = require('./plugin_runtime');
+const {
+    INTEGRATION_API_VERSION,
+    getRequestedIntegrationApiVersion,
+    isSupportedIntegrationApiVersion,
+    validateCanonicalPayload,
+    validateIntegrationEventEnvelope
+} = require('./integration_api_contract');
 
 let mainWindow;
 let tray;
@@ -123,7 +130,7 @@ function getRetryAfterMs(bucket) {
 
 function createCanonicalPayload() {
     return {
-        v: 1,
+        v: INTEGRATION_API_VERSION,
         status: appStatus,
         track: playerState.track,
         state: playerState.state,
@@ -133,22 +140,40 @@ function createCanonicalPayload() {
 }
 
 function formatJsonResponse(res, statusCode, payload) {
+    if (!validateCanonicalPayload(payload)) {
+        res.writeHead(500, {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'no-store'
+        });
+        res.end(JSON.stringify({
+            v: INTEGRATION_API_VERSION,
+            error: 'INVALID_CANONICAL_PAYLOAD'
+        }));
+        return false;
+    }
+
     const json = JSON.stringify(payload);
     res.writeHead(statusCode, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
+        'x-ytmamp-api-version': String(INTEGRATION_API_VERSION),
         'content-length': Buffer.byteLength(json)
     });
     res.end(json);
+    return true;
 }
 
 function broadcastIntegrationEvent(name, payload) {
     if (!integrationSseClients.size) return;
-    const body = JSON.stringify({
+    const bodyPayload = {
         type: name,
-        v: 1,
+        v: INTEGRATION_API_VERSION,
         payload
-    });
+    };
+    if (!validateIntegrationEventEnvelope(bodyPayload)) {
+        return;
+    }
+    const body = JSON.stringify(bodyPayload);
     const chunk = `event: ${name}\ndata: ${body}\n\n`;
     integrationSseClients.forEach((client) => {
         try {
@@ -179,6 +204,22 @@ function setupIntegrationServer() {
             const parsedUrl = new URL(req.url, `http://${INTEGRATION_HOST}:${INTEGRATION_PORT}`);
             const query = parsedUrl.searchParams;
             const token = query.get('token');
+            const apiVersion = getRequestedIntegrationApiVersion(query, req.headers);
+
+            if (!isSupportedIntegrationApiVersion(apiVersion)) {
+                res.writeHead(400, {
+                    'content-type': 'application/json; charset=utf-8',
+                    'cache-control': 'no-store',
+                    'x-ytmamp-api-version': String(INTEGRATION_API_VERSION)
+                });
+                res.end(JSON.stringify({
+                    v: INTEGRATION_API_VERSION,
+                    error: 'UNSUPPORTED_API_VERSION',
+                    requested: apiVersion,
+                    supported: [INTEGRATION_API_VERSION]
+                }));
+                return;
+            }
 
             if (!isAuthorizedIntegrationRequest(req, token)) {
                 res.writeHead(401, {
@@ -200,9 +241,10 @@ function setupIntegrationServer() {
             }
 
             if (req.method === 'GET' && parsedUrl.pathname === '/status') {
-                formatJsonResponse(res, 200, {
+                const payload = {
                     ...createCanonicalPayload()
-                });
+                };
+                if (formatJsonResponse(res, 200, payload) === false) return;
                 return;
             }
 
@@ -213,10 +255,11 @@ function setupIntegrationServer() {
                     return;
                 }
 
-                formatJsonResponse(res, 200, {
+                const payload = {
                     ...createCanonicalPayload(),
                     track: playerState.track
-                });
+                };
+                if (formatJsonResponse(res, 200, payload) === false) return;
                 return;
             }
 
@@ -237,11 +280,23 @@ function setupIntegrationServer() {
                     'x-accel-buffering': 'no'
                 });
                 res.write(': connected\n\n');
-                const payload = JSON.stringify({
+                const snapshotPayload = {
                     type: 'snapshot',
-                    v: 1,
+                    v: INTEGRATION_API_VERSION,
                     payload: createCanonicalPayload()
-                });
+                };
+                if (!validateIntegrationEventEnvelope(snapshotPayload)) {
+                    res.writeHead(500, {
+                        'content-type': 'application/json; charset=utf-8',
+                        'cache-control': 'no-store'
+                    });
+                    res.end(JSON.stringify({
+                        v: INTEGRATION_API_VERSION,
+                        error: 'INVALID_CANONICAL_PAYLOAD'
+                    }));
+                    return;
+                }
+                const payload = JSON.stringify(snapshotPayload);
                 res.write(`event: snapshot\ndata: ${payload}\n\n`);
                 const heartbeat = setInterval(() => {
                     try {

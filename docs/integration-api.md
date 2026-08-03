@@ -24,6 +24,24 @@ Responses:
 - `403` for non-local requests.
 - `429` for rate limit (retry after supplied in seconds).
 
+## API versioning
+
+Current API contract version: `1` (`v: 1` in payloads).
+
+Negotiation:
+
+- Query: `?v=1`, `?api=1`, `?apiVersion=1`, `?api_version=1`
+- Header: `X-YTMAMP-API-VERSION: 1`
+
+Responses include:
+
+- `x-ytmamp-api-version: 1`
+
+If client requests unsupported version:
+
+- `400 Bad Request`
+- `error: "UNSUPPORTED_API_VERSION"`
+
 ## Rate limiting
 
 - Window: `1000 ms`
@@ -54,6 +72,11 @@ curl -s "http://127.0.0.1:18880/status"
   "windowVisible": true
 }
 ```
+
+Validation note:
+
+- Server validates the response contract before serialization.
+- In case of internal payload mismatch, response is `500` with `error: INVALID_CANONICAL_PAYLOAD`.
 
 ### `GET /current-track`
 
@@ -90,8 +113,14 @@ Server-Sent Events stream:
 - Sends `snapshot` event immediately on connect.
 - Periodic heartbeats (`: heartbeat`) every 10s.
 - Push events:
-  - `event: track`
-  - `event: state`
+- `event: track`
+- `event: state`
+
+SSE envelope validation:
+
+- `type`: event name (`snapshot|track|state`)
+- `v`: contract version
+- `payload`: event payload
 
 **Example (curl)**
 
@@ -117,4 +146,3 @@ data: {"type":"state","v":1,"payload":{...}}
 - `status` values are forwarded from bridge/app internals.
 - Payload formats for `track` and `state` follow normalized player payloads used by UI/plugin runtime.
 - No CORS/CSP headers are set in v1.
-
