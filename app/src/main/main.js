@@ -3,13 +3,69 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
+const { createEventBus } = require('./event_bus');
 
 let mainWindow;
 let tray;
 let bridge;
 let isQuitting = false;
+const playerStateBus = createEventBus({ dedupeWindowMs: 350 });
+const playerState = {
+    track: null,
+    state: null,
+    lastTs: 0
+};
+const stateEventDedupWindowMs = 350;
 const localTrustEnabled = ['1', 'true', 'yes', 'on'].includes((process.env.LOCAL_TRUST || '').toLowerCase());
 const envBridgeToken = (process.env.BRIDGE_TOKEN || '').trim();
+
+function notifyPlayerEvent(eventType, payload) {
+    if (eventType === 'track') {
+        playerState.track = payload;
+        playerState.lastTs = Date.now();
+    }
+    if (eventType === 'state') {
+        playerState.state = payload;
+        playerState.lastTs = Date.now();
+    }
+}
+
+function publishPlayerEvent(eventType, payload, options = {}) {
+    const published = playerStateBus.emit(eventType, payload, options);
+    if (!published) return;
+    notifyPlayerEvent(eventType, payload);
+}
+
+function publishTrack(message) {
+    publishPlayerEvent('track', sanitizeTrackMessage(message), {
+        dedupeMs: stateEventDedupWindowMs
+    });
+}
+
+function publishState(state) {
+    const payload = {
+        ...state,
+        positionSec: Number.isFinite(state.positionSec) ? state.positionSec : 0,
+        durationSec: Number.isFinite(state.durationSec) ? state.durationSec : 0,
+        playing: typeof state.playing === 'boolean' ? state.playing : false
+    };
+
+    publishPlayerEvent('state', payload, {
+        dedupeMs: stateEventDedupWindowMs
+    });
+}
+
+playerStateBus.on('track', (payload) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('track-update', payload);
+    }
+});
+
+playerStateBus.on('state', (payload) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('state-update', payload);
+    }
+});
 
 // --- Settings Persistence ---
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
@@ -312,11 +368,11 @@ function setupWebSocket() {
             } else if (message.type === 'status') {
                 if (mainWindow) mainWindow.webContents.send('status-change', message.msg);
             } else if (message.type === 'track') {
-                if (mainWindow) mainWindow.webContents.send('track-update', sanitizeTrackMessage(message));
+                publishTrack(message);
             } else if (message.type === 'volStatus') {
                 if (mainWindow) mainWindow.webContents.send('vol-status', message.status);
             } else if (message.type === 'state') {
-                if (mainWindow) mainWindow.webContents.send('state-update', message);
+                publishState(message);
             } else if ((message.type === 'wave' || message.type === 'waveFallback')) {
                 if (mainWindow) mainWindow.webContents.send('wave-update', message);
             }
