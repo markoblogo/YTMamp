@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const http = require('http');
+const { URL } = require('url');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 const { createEventBus } = require('./event_bus');
 const { createPluginRuntime } = require('./plugin_runtime');
@@ -22,6 +24,16 @@ const playerState = {
 const stateEventDedupWindowMs = 350;
 const localTrustEnabled = ['1', 'true', 'yes', 'on'].includes((process.env.LOCAL_TRUST || '').toLowerCase());
 const envBridgeToken = (process.env.BRIDGE_TOKEN || '').trim();
+const integrationEnvToken = (process.env.INTEGRATION_TOKEN || '').trim();
+const INTEGRATION_HOST = '127.0.0.1';
+const INTEGRATION_PORT = Number(process.env.INTEGRATION_PORT) || 18880;
+const RATE_LIMIT_WINDOW_MS = 1000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const MAX_SSE_CLIENTS = 25;
+let integrationServer;
+const integrationSseClients = new Set();
+const integrationRateBuckets = new Map();
+let appStatus = 'OFFLINE';
 
 function notifyPlayerEvent(eventType, payload) {
     if (eventType === 'track') {
@@ -63,13 +75,209 @@ playerStateBus.on('track', (payload) => {
     if (mainWindow) {
         mainWindow.webContents.send('track-update', payload);
     }
+    broadcastIntegrationEvent('track', payload);
 });
 
 playerStateBus.on('state', (payload) => {
     if (mainWindow) {
         mainWindow.webContents.send('state-update', payload);
     }
+    broadcastIntegrationEvent('state', payload);
 });
+
+function parseRemoteIp(req) {
+    const raw = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : '';
+    if (raw === '::1') return '127.0.0.1';
+    return raw.startsWith('::ffff:') ? raw.replace('::ffff:', '') : raw;
+}
+
+function isLocalRequest(req) {
+    const ip = parseRemoteIp(req);
+    return ip === '127.0.0.1' || ip === '::1' || ip === 'localhost';
+}
+
+function isAuthorizedIntegrationRequest(req, queryToken) {
+    if (!integrationEnvToken) return true;
+    const headerToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+    const xToken = (req.headers['x-ytmamp-token'] || '').trim();
+    const token = queryToken || headerToken || xToken;
+    return token === integrationEnvToken;
+}
+
+function getRateBucket(ip) {
+    const now = Date.now();
+    const bucket = integrationRateBuckets.get(ip) || { count: 0, start: now };
+    if (now - bucket.start >= RATE_LIMIT_WINDOW_MS) {
+        bucket.count = 0;
+        bucket.start = now;
+    }
+    bucket.count++;
+    integrationRateBuckets.set(ip, bucket);
+    return bucket;
+}
+
+function getRetryAfterMs(bucket) {
+    const elapsed = Date.now() - bucket.start;
+    return Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - elapsed) / 1000));
+}
+
+function createCanonicalPayload() {
+    return {
+        v: 1,
+        status: appStatus,
+        track: playerState.track,
+        state: playerState.state,
+        updatedAt: playerState.lastTs || 0,
+        windowVisible: !!(mainWindow && mainWindow.isVisible())
+    };
+}
+
+function formatJsonResponse(res, statusCode, payload) {
+    const json = JSON.stringify(payload);
+    res.writeHead(statusCode, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        'content-length': Buffer.byteLength(json)
+    });
+    res.end(json);
+}
+
+function broadcastIntegrationEvent(name, payload) {
+    if (!integrationSseClients.size) return;
+    const body = JSON.stringify({
+        type: name,
+        v: 1,
+        payload
+    });
+    const chunk = `event: ${name}\ndata: ${body}\n\n`;
+    integrationSseClients.forEach((client) => {
+        try {
+            client.write(chunk);
+        } catch (error) {
+            integrationSseClients.delete(client);
+        }
+    });
+}
+
+function setupIntegrationServer() {
+    integrationServer = http.createServer((req, res) => {
+        try {
+            if (!req.url) {
+                res.writeHead(400);
+                res.end('bad request');
+                return;
+            }
+
+            if (!isLocalRequest(req)) {
+                res.writeHead(403, {
+                    'content-type': 'text/plain; charset=utf-8'
+                });
+                res.end('forbidden');
+                return;
+            }
+
+            const parsedUrl = new URL(req.url, `http://${INTEGRATION_HOST}:${INTEGRATION_PORT}`);
+            const query = parsedUrl.searchParams;
+            const token = query.get('token');
+
+            if (!isAuthorizedIntegrationRequest(req, token)) {
+                res.writeHead(401, {
+                    'www-authenticate': 'Bearer realm="ytmamp-local"',
+                    'content-type': 'text/plain; charset=utf-8'
+                });
+                res.end('unauthorized');
+                return;
+            }
+
+            const bucket = getRateBucket(parseRemoteIp(req));
+            if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
+                res.writeHead(429, {
+                    'retry-after': String(getRetryAfterMs(bucket)),
+                    'content-type': 'text/plain; charset=utf-8'
+                });
+                res.end('rate limit exceeded');
+                return;
+            }
+
+            if (req.method === 'GET' && parsedUrl.pathname === '/status') {
+                formatJsonResponse(res, 200, {
+                    ...createCanonicalPayload()
+                });
+                return;
+            }
+
+            if (req.method === 'GET' && parsedUrl.pathname === '/current-track') {
+                if (!playerState.track) {
+                    res.writeHead(204, { 'cache-control': 'no-store' });
+                    res.end();
+                    return;
+                }
+
+                formatJsonResponse(res, 200, {
+                    ...createCanonicalPayload(),
+                    track: playerState.track
+                });
+                return;
+            }
+
+            if (parsedUrl.pathname === '/events' && req.method === 'GET') {
+                if (integrationSseClients.size >= MAX_SSE_CLIENTS) {
+                    res.writeHead(429, {
+                        'content-type': 'text/plain; charset=utf-8',
+                        'retry-after': '1'
+                    });
+                    res.end('too many SSE clients');
+                    return;
+                }
+
+                res.writeHead(200, {
+                    'content-type': 'text/event-stream; charset=utf-8',
+                    'cache-control': 'no-store',
+                    connection: 'keep-alive',
+                    'x-accel-buffering': 'no'
+                });
+                res.write(': connected\n\n');
+                const payload = JSON.stringify({
+                    type: 'snapshot',
+                    v: 1,
+                    payload: createCanonicalPayload()
+                });
+                res.write(`event: snapshot\ndata: ${payload}\n\n`);
+                const heartbeat = setInterval(() => {
+                    try {
+                        res.write(': heartbeat\n\n');
+                    } catch (error) {
+                        clearInterval(heartbeat);
+                    }
+                }, 10000);
+                const cleanup = () => {
+                    clearInterval(heartbeat);
+                    integrationSseClients.delete(res);
+                };
+                req.on('close', cleanup);
+                req.on('aborted', cleanup);
+                integrationSseClients.add(res);
+                return;
+            }
+
+            res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+            res.end('not found');
+        } catch (error) {
+            console.error('[LocalAPI] request error:', error.message);
+            res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+            res.end('internal error');
+        }
+    });
+
+    integrationServer.on('error', (error) => {
+        console.error('[LocalAPI] server error:', error.message);
+    });
+
+    integrationServer.listen(INTEGRATION_PORT, INTEGRATION_HOST, () => {
+        console.log(`[LocalAPI] listening on http://${INTEGRATION_HOST}:${INTEGRATION_PORT}`);
+        console.log('[LocalAPI] endpoints: /status, /current-track, /events');
+    });
+}
 
 // --- Settings Persistence ---
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
@@ -420,6 +628,7 @@ function setupWebSocket() {
         authTimeoutMs: 7000,
         onStatus: (status) => {
             if (status === 'listening') console.log('[WS] Server started on ws://127.0.0.1:18765');
+            appStatus = status === 'listening' ? 'CONNECTED' : status;
         },
         onConnection: (ws, req) => {
             const clientIp = req.socket.remoteAddress;
@@ -459,6 +668,7 @@ function setupWebSocket() {
             } else if (message.type === 'get-settings') {
                 ws.send(JSON.stringify({ type: 'settings', v: 1, settings }));
             } else if (message.type === 'status') {
+                appStatus = message.msg || appStatus;
                 if (mainWindow) mainWindow.webContents.send('status-change', message.msg);
             } else if (message.type === 'track') {
                 publishTrack(message);
@@ -505,6 +715,7 @@ app.whenReady().then(() => {
     createWindow();
     createTray();
     setupIpc();
+    setupIntegrationServer();
     setupWebSocket();
 
     app.on('activate', function () {
@@ -519,6 +730,19 @@ app.on('window-all-closed', function () {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (integrationServer) {
+        for (const client of integrationSseClients) {
+            try {
+                client.end();
+            } catch (error) {
+                // ignore
+            }
+        }
+        integrationSseClients.clear();
+        integrationRateBuckets.clear();
+        integrationServer.close();
+        integrationServer = undefined;
+    }
     if (bridge) bridge.stop();
     if (tray) tray.destroy();
     if (pluginRuntime) pluginRuntime.unload();
