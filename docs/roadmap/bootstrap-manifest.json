@@ -1,0 +1,33 @@
+{
+  "milestones": [
+    "Sprint 1",
+    "Sprint 2"
+  ],
+  "labels": [
+    "epic/core",
+    "epic/security",
+    "epic/integration",
+    "epic/plugins",
+    "epic/os",
+    "refactor",
+    "type-safety",
+    "protocol",
+    "auth",
+    "infrastructure",
+    "events",
+    "runtime",
+    "api",
+    "ui",
+    "renderer",
+    "security",
+    "hotkeys",
+    "tray",
+    "profiles",
+    "discord",
+    "presence",
+    "obs",
+    "streaming",
+    "lastfm",
+    "queue"
+  ]
+}

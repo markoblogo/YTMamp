@@ -1,0 +1,83 @@
+Title,Body,Labels,Assignees,Milestone
+"S1-01: Core contracts: shared protocol/events/state","Acceptance:
+- [ ] Given расширение шлёт track/state/cmd, when общая schema применяется и валидация/нормализация централизованы, then все компоненты обрабатывают payload одинаково.
+- [ ] Given новое событие `onTrackChange`, when оно описано в контракте и импортировано в main/renderer, then code-pathы остаются совместимы.
+
+Файлы:
+- app/src/main/ws_bridge.js
+- app/src/main/main.js
+- app/src/renderer/renderer.js
+- extension/src/background.js
+- extension/src/content.js","epic/core, refactor, type-safety","you","Sprint 1"
+"S1-02: Secure WS bridge auth","Acceptance:
+- [ ] Given extension без токена в prod, when подключается к ws, then соединение отклоняется с диагностикой.
+- [ ] Given корректный токен, when cmd/track приходят, then main принимает сообщения.
+- [ ] Given LOCAL_TRUST=true, when legacy клиент без токена подключается, then соединение разрешено для dev.
+
+Файлы:
+- app/src/main/ws_bridge.js
+- app/src/main/main.js
+- extension/src/background.js
+- docs/protocol.md","epic/security, protocol, auth","you","Sprint 1"
+"S1-03: EventBus single source of truth","Acceptance:
+- [ ] Given приходит state/track из extension, when eventBus транслирует событие, then renderer + API-потоки получают единый payload.
+- [ ] Given дубли event в коротком интервале, when второй event приходит, then UI не дублируется.
+
+Файлы:
+- app/src/main/main.js
+- app/src/main/preload.js
+- app/src/renderer/renderer.js
+- extension/src/background.js","epic/core, infrastructure, events","you","Sprint 1"
+"S1-04: Plugin runtime (discovery/lifecycle)","Acceptance:
+- [ ] Given валидный plugin manifest, when app стартует, then plugin загружается и регистрирует callbacks.
+- [ ] Given ошибка плагина, when runtime продолжает работу, then app не падает.
+
+Файлы:
+- app/src/main/main.js
+- app/src/main/preload.js","epic/plugins, runtime, api","you","Sprint 1"
+"S1-05: Plugin UI mount points","Acceptance:
+- [ ] Given plugin запрашивает panel mount, when renderer инициализирован, then mount-point создаётся без ломки UI.
+- [ ] Given unsafe DOM access, when попытка происходит, then блокируется и пишет warning.
+
+Файлы:
+- app/src/renderer/index.html
+- app/src/renderer/styles.css
+- app/src/renderer/renderer.js","epic/plugins, ui, renderer","you","Sprint 1"
+"S2-01: Integration API (HTTP+SSE/WS)","Acceptance:
+- [ ] Given запрос /current-track, when track доступен, then возвращается canonical payload.
+- [ ] Given rate-limit превышен, then API возвращает 429 с retry-after.
+
+Файлы:
+- app/src/main/main.js
+- extension/src/background.js","epic/integration, api, bridge","you","Sprint 2"
+"S2-02: Last.fm scrobbling","Acceptance:
+- [ ] Given трек завершён, when наступает порог scrobble, then отсылается now playing + scrobble.
+- [ ] Given ошибки Last.fm API, when отправка неуспешна, then события уходят в retry-очередь.
+
+Файлы:
+- app/src/renderer/renderer.js
+- app/src/main/main.js","epic/integration, lastfm, queue","you","Sprint 2"
+"S2-03: Discord Rich Presence","Acceptance:
+- [ ] Given Discord доступен, when playback changes, then Rich Presence обновляется.
+- [ ] Given Discord недоступен, when обновление пытается выполниться, then fail-safe и no-crash.
+
+Файлы:
+- app/src/main/main.js
+- app/src/renderer/renderer.js","epic/integration, discord, presence","you","Sprint 2"
+"S2-04: OBS overlay endpoint","Acceptance:
+- [ ] Given OBS запрашивает overlay endpoint, when track changes, then обновляется read-only payload.
+- [ ] Given disallowed Origin, when запрос идёт, then access denied.
+
+Файлы:
+- app/src/main/main.js
+- docs/protocol.md","epic/integration, obs, streaming","you","Sprint 2"
+"S2-05: Profiles + hotkeys + tray actions","Acceptance:
+- [ ] Given профиль focus, when app запускается, then применяются профильные параметры.
+- [ ] Given tray action Next, when клик, then команда выполняется и статус подтверждается.
+- [ ] Given global media key Play, when OS отправляет key, then playback переключается.
+
+Файлы:
+- app/src/main/main.js
+- app/src/main/preload.js
+- app/src/renderer/renderer.js
+- extension/popup/popup.js","epic/os, hotkeys, tray, profiles","you","Sprint 2"

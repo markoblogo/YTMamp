@@ -142,3 +142,7 @@ Release builds are produced by GitHub Actions on matching runners: macOS, Window
 
 ## 📄 License
 Distributed under the MIT License. See `LICENSE` for more information.
+
+### 📌 Roadmap
+
+See [next release backlog](docs/roadmap/next-release-backlog.md) for the 2-sprint plan and import artifacts.
