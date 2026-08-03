@@ -7,6 +7,7 @@ const { URL } = require('url');
 const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('./ws_bridge');
 const { createEventBus } = require('./event_bus');
 const { createPluginRuntime } = require('./plugin_runtime');
+const { configurePlayerCastBridge, playerGetState, playerAction } = require('./playerCastBridge');
 require.extensions['.ts'] = require.extensions['.js'];
 const { createObsOverlayService } = require('./integrations/obs.ts');
 const { createLastFmScrobbler, DEFAULT_TRACK_THRESHOLD_SEC, DEFAULT_MIN_TRACK_DURATION_SEC } = require('./integrations/lastfm');
@@ -36,12 +37,12 @@ const stateEventDedupWindowMs = 350;
 const localTrustEnabled = ['1', 'true', 'yes', 'on'].includes((process.env.LOCAL_TRUST || '').toLowerCase());
 const envBridgeToken = (process.env.BRIDGE_TOKEN || '').trim();
 const integrationEnvToken = (process.env.INTEGRATION_TOKEN || '').trim();
+const INTEGRATION_HOST = process.env.INTEGRATION_HOST || '0.0.0.0';
+const INTEGRATION_PORT = Number(process.env.INTEGRATION_PORT) || 18880;
 const OBS_ORIGIN_ALLOWLIST = parseEnvOriginList(process.env.OBS_ORIGIN_ALLOWLIST || '');
 const LASTFM_ENABLED = ['1', 'true', 'yes', 'on'].includes((process.env.LASTFM_ENABLED || '').toLowerCase());
 const LASTFM_TRACK_THRESHOLD_SEC = Number.parseInt(process.env.LASTFM_TRACK_THRESHOLD_SEC || '', 10) || DEFAULT_TRACK_THRESHOLD_SEC;
 const LASTFM_MIN_TRACK_DURATION_SEC = Number.parseInt(process.env.LASTFM_MIN_TRACK_DURATION_SEC || '', 10) || DEFAULT_MIN_TRACK_DURATION_SEC;
-const INTEGRATION_HOST = '127.0.0.1';
-const INTEGRATION_PORT = Number(process.env.INTEGRATION_PORT) || 18880;
 const RATE_LIMIT_WINDOW_MS = 1000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 const MAX_SSE_CLIENTS = 25;
@@ -166,9 +167,96 @@ function parseRemoteIp(req) {
     return raw.startsWith('::ffff:') ? raw.replace('::ffff:', '') : raw;
 }
 
+function normalizeIp(ip) {
+    if (!ip) return '';
+    const trimmed = String(ip).trim();
+    if (trimmed === '::1') return '127.0.0.1';
+    return trimmed.startsWith('::ffff:') ? trimmed.slice(7) : trimmed;
+}
+
 function isLocalRequest(req) {
     const ip = parseRemoteIp(req);
     return ip === '127.0.0.1' || ip === '::1' || ip === 'localhost';
+}
+
+function isPrivateIpv4(ip) {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    const octets = parts.map((part) => Number.parseInt(part, 10));
+    if (octets.some((value) => !Number.isFinite(value) || value < 0 || value > 255)) return false;
+
+    const [first, second] = octets;
+    return first === 10
+        || first === 127
+        || (first === 172 && second >= 16 && second <= 31)
+        || (first === 192 && second === 168)
+        || (first === 169 && second === 254);
+}
+
+function isPrivateIpv6(ip) {
+    return /^::1$/.test(ip) ||
+        /^fd[0-9a-f]{2}:/i.test(ip) ||
+        /^fe80:/i.test(ip);
+}
+
+function isLanRequest(req) {
+    const ip = normalizeIp(parseRemoteIp(req));
+    return ip === '127.0.0.1' || isPrivateIpv4(ip) || isPrivateIpv6(ip);
+}
+
+function isCastApiPath(pathname = '') {
+    return pathname === '/api/cast/status' || pathname === '/api/cast/cmd';
+}
+
+function formatCastResponse(res, statusCode, payload, req, extraHeaders = {}) {
+    const origin = (req && req.headers && typeof req.headers.origin === 'string' && req.headers.origin.trim()) || '*';
+    const body = JSON.stringify(payload);
+    res.writeHead(statusCode, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        'x-ytmamp-api-version': String(INTEGRATION_API_VERSION),
+        'access-control-allow-origin': origin,
+        'access-control-allow-methods': 'GET, POST, OPTIONS',
+        'access-control-allow-headers': 'Content-Type, X-YTMAMP-Token',
+        'vary': 'Origin',
+        ...extraHeaders,
+        'content-length': Buffer.byteLength(body)
+    });
+    res.end(body);
+}
+
+function sendCastNoTrack(res, req) {
+    return formatCastResponse(res, 200, {
+        ok: false,
+        state: 'stopped',
+        source: 'ytmamp',
+        error: 'no_active_track'
+    }, req);
+}
+
+function readJsonBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', (chunk) => {
+            body += chunk.toString('utf8');
+            if (body.length > 4096) {
+                req.removeAllListeners('data');
+                req.removeAllListeners('end');
+                reject(new Error('payload_too_large'));
+            }
+        });
+
+        req.on('end', () => {
+            if (!body) return resolve({});
+            try {
+                resolve(JSON.parse(body));
+            } catch (error) {
+                reject(error);
+            }
+        });
+
+        req.on('error', reject);
+    });
 }
 
 function isAuthorizedIntegrationRequest(req, queryToken) {
@@ -262,24 +350,52 @@ function setupIntegrationServer() {
             'cache-control': 'no-store',
             ...integrationBaseHeaders
         };
-        try {
+        (async () => {
             if (!req.url) {
                 res.writeHead(400, integrationBaseHeaders);
                 res.end('bad request');
                 return;
             }
 
-            if (!isLocalRequest(req)) {
-                res.writeHead(403, {
-                    ...integrationBaseHeaders,
-                    'content-type': 'text/plain; charset=utf-8'
-                });
-                res.end('forbidden');
-                return;
-            }
-
             const parsedUrl = new URL(req.url, `http://${INTEGRATION_HOST}:${INTEGRATION_PORT}`);
             const query = parsedUrl.searchParams;
+            const isCastApi = isCastApiPath(parsedUrl.pathname);
+
+            if (isCastApi) {
+                if (!isLanRequest(req)) {
+                    res.writeHead(403, {
+                        ...integrationBaseHeaders,
+                        'content-type': 'text/plain; charset=utf-8'
+                    });
+                    res.end('forbidden');
+                    return;
+                }
+
+                if (req.method === 'OPTIONS') {
+                    const origin = (req.headers.origin || '*').trim();
+                    const preflightHeaders = {
+                        'content-type': 'text/plain; charset=utf-8',
+                        'access-control-allow-origin': origin || '*',
+                        'access-control-allow-methods': 'GET, POST, OPTIONS',
+                        'access-control-allow-headers': 'Content-Type, X-YTMAMP-Token',
+                        'access-control-max-age': '300',
+                        'vary': 'Origin'
+                    };
+                    res.writeHead(204, { ...integrationBaseHeaders, ...preflightHeaders });
+                    res.end();
+                    return;
+                }
+            } else {
+                if (!isLocalRequest(req)) {
+                    res.writeHead(403, {
+                        ...integrationBaseHeaders,
+                        'content-type': 'text/plain; charset=utf-8'
+                    });
+                    res.end('forbidden');
+                    return;
+                }
+            }
+
             const token = query.get('token');
             const apiVersion = getRequestedIntegrationApiVersion(query, req.headers);
 
@@ -298,7 +414,7 @@ function setupIntegrationServer() {
                 return;
             }
 
-            if (!isAuthorizedIntegrationRequest(req, token)) {
+            if (!isCastApi && !isAuthorizedIntegrationRequest(req, token)) {
                 res.writeHead(401, {
                     ...integrationBaseHeaders,
                     'www-authenticate': 'Bearer realm="ytmamp-local"',
@@ -342,6 +458,93 @@ function setupIntegrationServer() {
                     track: playerState.track
                 };
                 if (formatJsonResponse(res, 200, payload) === false) return;
+                return;
+            }
+
+            if (req.method === 'GET' && parsedUrl.pathname === '/api/cast/status') {
+                const state = await playerGetState();
+                if (!state) {
+                    sendCastNoTrack(res, req);
+                    return;
+                }
+
+                formatCastResponse(res, 200, {
+                    ok: true,
+                    state: state.state || 'stopped',
+                    source: 'ytmamp',
+                    track: state.track || {
+                        title: '',
+                        artist: '',
+                        album: '',
+                        track_id: '',
+                        duration_ms: 0,
+                        position_ms: 0
+                    },
+                    time: state.time || Date.now()
+                }, req);
+                return;
+            }
+
+            if (req.method === 'POST' && parsedUrl.pathname === '/api/cast/cmd') {
+                let payload;
+                try {
+                    payload = await readJsonBody(req);
+                } catch (error) {
+                    formatCastResponse(res, 400, {
+                        ok: false,
+                        state: 'error',
+                        source: 'ytmamp',
+                        error: error.message === 'payload_too_large' ? 'payload_too_large' : 'invalid_json'
+                    }, req);
+                    return;
+                }
+                const action = String(payload && payload.action ? payload.action : '').trim().toLowerCase();
+                const allowed = new Set(['play', 'pause', 'toggle', 'stop', 'next', 'prev']);
+                if (!allowed.has(action)) {
+                    formatCastResponse(res, 400, {
+                        ok: false,
+                        state: 'error',
+                        source: 'ytmamp',
+                        error: 'invalid_action'
+                    }, req);
+                    return;
+                }
+
+                const actionResult = await playerAction(action);
+                if (!actionResult?.ok) {
+                    if (actionResult?.error === 'no_active_track') {
+                        sendCastNoTrack(res, req);
+                    } else {
+                        formatCastResponse(res, 200, {
+                            ok: false,
+                            state: 'error',
+                            source: 'ytmamp',
+                            error: actionResult?.error || 'action_failed'
+                        }, req);
+                    }
+                    return;
+                }
+
+                const state = await playerGetState();
+                if (!state) {
+                    sendCastNoTrack(res, req);
+                    return;
+                }
+
+                formatCastResponse(res, 200, {
+                    ok: true,
+                    state: state.state || 'stopped',
+                    source: 'ytmamp',
+                    track: state.track || {
+                        title: '',
+                        artist: '',
+                        album: '',
+                        track_id: '',
+                        duration_ms: 0,
+                        position_ms: 0
+                    },
+                    time: state.time || Date.now()
+                }, req);
                 return;
             }
 
@@ -463,11 +666,11 @@ function setupIntegrationServer() {
 
             res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
             res.end('not found');
-        } catch (error) {
+        })().catch((error) => {
             console.error('[LocalAPI] request error:', error.message);
             res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
             res.end('internal error');
-        }
+        });
     });
 
     integrationServer.on('error', (error) => {
@@ -476,7 +679,7 @@ function setupIntegrationServer() {
 
     integrationServer.listen(INTEGRATION_PORT, INTEGRATION_HOST, () => {
         console.log(`[LocalAPI] listening on http://${INTEGRATION_HOST}:${INTEGRATION_PORT}`);
-        console.log('[LocalAPI] endpoints: /status, /current-track, /events, /obs');
+        console.log('[LocalAPI] endpoints: /status, /current-track, /events, /obs, /api/cast/status, /api/cast/cmd');
     });
 }
 
@@ -917,6 +1120,22 @@ app.whenReady().then(() => {
     createWindow();
     createTray();
     setupIpc();
+    configurePlayerCastBridge({
+        getPlayerSnapshot: () => ({
+            track: playerState.track,
+            state: playerState.state
+        }),
+        sendPlayerAction: (command) => {
+            if (!bridge) return { ok: false, error: 'bridge_unavailable' };
+            const sent = bridge.relayCommand({
+                v: 1,
+                type: 'cmd',
+                id: `cast-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                cmd: command
+            });
+            return sent ? { ok: true } : { ok: false, error: 'command_send_failed' };
+        }
+    });
     setupIntegrationServer();
     setupWebSocket();
 
