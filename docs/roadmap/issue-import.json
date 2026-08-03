@@ -1,72 +1,106 @@
 [
   {
     "title": "S1-01: Core contracts: shared protocol/events/state",
-    "labels": ["epic/core", "refactor", "type-safety"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/core",
+      "refactor",
+      "type-safety"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 1",
     "body": "## Epic\nCore Platform\n\n## Story points\n8\n\n## Depends on\n- —\n\n## Acceptance\n- [ ] Given расширение шлёт track/state/cmd, when общая schema применяется и валидация/нормализация централизованы, then все компоненты обрабатывают payload одинаково.\n- [ ] Given новое событие `onTrackChange`, when оно описано в контракте и импортировано в main/renderer, then code-pathы остаются совместимы.\n\n## File anchors\n- app/src/main/ws_bridge.js:45-85\n- app/src/main/main.js:291-302\n- app/src/renderer/renderer.js:11-15\n- extension/src/background.js:121-261\n- extension/src/content.js:92-101"
   },
   {
     "title": "S1-02: Secure WS bridge auth",
-    "labels": ["epic/security", "protocol", "auth"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/security",
+      "protocol",
+      "auth"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 1",
     "body": "## Epic\nSecurity + Protocol\n\n## Story points\n6\n\n## Depends on\n- S1-01\n\n## Acceptance\n- [ ] Given extension без токена в prod, when подключается к WS bridge, then соединение отклоняется с диагностикой.\n- [ ] Given корректный токен, when cmd/track приходят, then main принимает сообщения.\n- [ ] Given `LOCAL_TRUST=true`, when legacy клиент без токена подключается, then соединение допускается для dev-mode.\n\n## File anchors\n- app/src/main/ws_bridge.js:87-197\n- app/src/main/main.js:232-241\n- extension/src/background.js:96-120\n- docs/protocol.md:1-35"
   },
   {
     "title": "S1-03: EventBus single source of truth",
-    "labels": ["epic/core", "infrastructure", "events"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/core",
+      "infrastructure",
+      "events"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 1",
     "body": "## Epic\nEvent Infrastructure\n\n## Story points\n7\n\n## Depends on\n- S1-01\n\n## Acceptance\n- [ ] Given приходит state/track из extension, when eventBus транслирует событие, then renderer + API-потоки получают единый payload.\n- [ ] Given дубль одного event в коротком интервале, when приходит второй раз, then UI не дрожит и не дублирует update.\n\n## File anchors\n- app/src/main/main.js:241-287\n- app/src/main/main.js:291-302\n- app/src/main/preload.js:1-10\n- app/src/renderer/renderer.js:232-254\n- extension/src/background.js:139-151"
   },
   {
     "title": "S1-04: Plugin runtime discovery + lifecycle",
-    "labels": ["epic/plugins", "runtime", "api"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/plugins",
+      "runtime",
+      "api"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 1",
     "body": "## Epic\nPlugin System\n\n## Story points\n8\n\n## Depends on\n- S1-03\n\n## Acceptance\n- [ ] Given валидный plugin manifest, when app стартует, then plugin грузится и регистрирует callbacks.\n- [ ] Given ошибка init плагина, when runtime продолжает работу, then app не падает.\n\n## File anchors\n- app/src/main/main.js:291-302\n- app/src/main/preload.js:1-10"
   },
   {
     "title": "S1-05: Plugin UI mount points",
-    "labels": ["epic/plugins", "ui", "renderer"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/plugins",
+      "ui",
+      "renderer"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 1",
     "body": "## Epic\nPlugin UI\n\n## Story points\n5\n\n## Depends on\n- S1-04\n\n## Acceptance\n- [ ] Given plugin запрашивает panel mount, when renderer инициализирован, then mount-point создаётся без поломки UI.\n- [ ] Given unsafe DOM-модификация плагина, when выполняется, then она блокируется и пишет warning.\n\n## File anchors\n- app/src/renderer/index.html:19-36\n- app/src/renderer/styles.css:20-120\n- app/src/renderer/renderer.js:160-188"
   },
   {
     "title": "S2-01: Integration API (HTTP + SSE/WS)",
-    "labels": ["epic/integration", "api", "bridge"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/integration",
+      "api",
+      "bridge"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 2",
     "body": "## Epic\nIntegrations Platform\n\n## Story points\n6\n\n## Depends on\n- S1-03\n\n## Acceptance\n- [ ] Given external client запрашивает /current-track, when трек доступен, then возвращается canonical payload.\n- [ ] Given rate-limit превышен, when request flood идёт, then 429 + Retry-After.\n\n## File anchors\n- app/src/main/main.js:232-240\n- extension/src/background.js:96-120\n- app/src/renderer/renderer.js:232-254"
   },
   {
     "title": "S2-02: Last.fm scrobbling",
-    "labels": ["epic/integration", "lastfm", "queue"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/integration",
+      "lastfm",
+      "queue"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 2",
     "body": "## Epic\nIntegrations\n\n## Story points\n7\n\n## Depends on\n- S2-01\n\n## Acceptance\n- [ ] Given трек завершён, when scrobble threshold достигается, then отправляется now playing + scrobble.\n- [ ] Given ошибки 429/5xx, when отправка падает, then событие уходит в retry-очередь.\n\n## File anchors\n- app/src/renderer/renderer.js:116-134\n- extension/src/content.js:92-110\n- app/src/main/main.js:276-285"
   },
   {
-    "title": "S2-03: Discord Rich Presence",
-    "labels": ["epic/integration", "discord", "presence"],
-    "assignees": ["you"],
-    "milestone": "Sprint 2",
-    "body": "## Epic\nIntegrations\n\n## Story points\n6\n\n## Depends on\n- S2-01\n\n## Acceptance\n- [ ] Given Discord клиент доступен, when playback changes, then Presence обновляется.\n- [ ] Given Discord недоступен, when API вызывается, then graceful fallback без crash.\n\n## File anchors\n- app/src/main/main.js:276-285\n- app/src/renderer/renderer.js:232-254\n- app/package.json:27-33"
-  },
-  {
     "title": "S2-04: OBS overlay endpoint",
-    "labels": ["epic/integration", "obs", "streaming"],
-    "assignees": ["you"],
+    "labels": [
+      "epic/integration",
+      "obs",
+      "streaming"
+    ],
+    "assignees": [
+      "you"
+    ],
     "milestone": "Sprint 2",
     "body": "## Epic\nIntegrations\n\n## Story points\n5\n\n## Depends on\n- S2-01\n\n## Acceptance\n- [ ] Given OBS endpoint вызывается, when трек меняется, then payload только из allowlist.\n- [ ] Given disallowed Origin, when request идёт, then access denied.\n\n## File anchors\n- app/src/main/main.js:232-241\n- app/src/main/main.js:276-285\n- docs/protocol.md:1-35"
-  },
-  {
-    "title": "S2-05: Profiles + hotkeys + tray actions",
-    "labels": ["epic/os", "hotkeys", "tray", "profiles"],
-    "assignees": ["you"],
-    "milestone": "Sprint 2",
-    "body": "## Epic\nOS + UX\n\n## Story points\n8\n\n## Depends on\n- S1-05\n\n## Acceptance\n- [ ] Given профиль `focus`, when app запускается, then применяются параметры профиля.\n- [ ] Given tray action Next, when пользователь кликает, then команда выполняется.\n- [ ] Given global media key Play, when OS отправляет key, then playback переключается.\n\n## File anchors\n- app/src/main/main.js:122-142\n- app/src/main/main.js:168-218\n- app/src/main/preload.js:1-10\n- extension/popup/popup.js:11-61"
   }
 ]

@@ -57,27 +57,10 @@ Title,Body,Labels,Assignees,Milestone
 Файлы:
 - app/src/renderer/renderer.js
 - app/src/main/main.js","epic/integration, lastfm, queue","you","Sprint 2"
-"S2-03: Discord Rich Presence","Acceptance:
-- [ ] Given Discord доступен, when playback changes, then Rich Presence обновляется.
-- [ ] Given Discord недоступен, when обновление пытается выполниться, then fail-safe и no-crash.
-
-Файлы:
-- app/src/main/main.js
-- app/src/renderer/renderer.js","epic/integration, discord, presence","you","Sprint 2"
 "S2-04: OBS overlay endpoint","Acceptance:
-- [ ] Given OBS запрашивает overlay endpoint, when track changes, then обновляется read-only payload.
+- [ ] Given OBS endpoint вызывается, when track changes, then обновляется read-only payload.
 - [ ] Given disallowed Origin, when запрос идёт, then access denied.
 
 Файлы:
 - app/src/main/main.js
 - docs/protocol.md","epic/integration, obs, streaming","you","Sprint 2"
-"S2-05: Profiles + hotkeys + tray actions","Acceptance:
-- [ ] Given профиль focus, when app запускается, then применяются профильные параметры.
-- [ ] Given tray action Next, when клик, then команда выполняется и статус подтверждается.
-- [ ] Given global media key Play, when OS отправляет key, then playback переключается.
-
-Файлы:
-- app/src/main/main.js
-- app/src/main/preload.js
-- app/src/renderer/renderer.js
-- extension/popup/popup.js","epic/os, hotkeys, tray, profiles","you","Sprint 2"

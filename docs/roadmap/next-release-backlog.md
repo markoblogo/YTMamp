@@ -65,6 +65,11 @@ Acceptance:
 
 ## Sprint 2 — Integrations + UX/OS
 
+### Release scope lock (v0.3.3)
+- В релиз входят: `S2-01`, `S2-02`, `S2-04`.
+- `S2-03 Discord Rich Presence` исключён навсегда (не нужен по продуктовой задаче пользователя).
+- `S2-05 Профили, hotkeys, tray actions` переносится на следующий цикл и в этом релизе не включается.
+
 ### S2-01 Локальный integration API (`/status`, `/current-track`, SSE/WS)
 - `Epic`: Integrations Platform
 - `Story points`: 6
@@ -76,13 +81,6 @@ Acceptance:
 - `Epic`: Integrations
 - `Story points`: 7
 - `labels`: `epic/integration`, `lastfm`, `queue`
-- `assignee`: `you`
-- `depends on`: S2-01
-
-### S2-03 Discord Rich Presence
-- `Epic`: Integrations
-- `Story points`: 6
-- `labels`: `epic/integration`, `discord`, `presence`
 - `assignee`: `you`
 - `depends on`: S2-01
 
@@ -110,4 +108,3 @@ Acceptance:
 - `extension/src/ytm_adapter.js`
 - `app/package.json`
 - `docs/protocol.md`
-

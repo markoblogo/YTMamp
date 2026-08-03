@@ -17,8 +17,8 @@ Get the latest desktop build from [GitHub Releases](https://github.com/markoblog
 - Linux: `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb`
 
 Package status:
-- macOS/Windows/Linux smoke checks are completed for v0.3.2.
-- v0.3.3 hardening tasks are in-progress (`deterministic reconnect`, `tray/autostart proof`, and PR smoke summary automation).
+- macOS/Windows/Linux smoke checks are completed for v0.3.3.
+- v0.3.3 includes integration API hardening, Last.fm scrobbling, and OBS overlay; Discord hotkeys/profiles are out of this release scope.
 
 ### Verified matrix
 

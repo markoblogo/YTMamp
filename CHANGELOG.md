@@ -2,14 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.3] - Unreleased
+## [0.3.3] - 2026-08-03
 ### Added
-- Added a CI smoke-checklist validation gate for matrix jobs.
-- Added PR hardening automation scripts for smoke-check summary generation and PR description injection.
+- Implemented local integration API contract baseline (`/status`, `/current-track`, `/events`) with versioned headers and auth/rate-limit behavior.
+- Added Last.fm scrobbling with retry queueing and graceful degrade on failure scenarios.
+- Added OBS overlay endpoint (`/obs`) with origin allowlist + CORS preflight handling + minimal payload contract.
+- Extended CI smoke reporting with `/status` and `/current-track` contract matrix artifacts.
+- Added a CI smoke-checklist validation and PR description automation for local API hardening.
 
 ### Changed
-- Hardened extension background socket reconnection with bounded exponential backoff and heartbeat monitoring.
-- Added deterministic reconnect path that recovers from socket close/errors and respects manual disconnect/autoconnect toggles.
+- CI now validates API contracts for `/status`, `/current-track`, `/events`, and `/obs` via checklist and smoke-summary export.
 
 ## [0.3.2] - 2026-06-09
 ### Added
