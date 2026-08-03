@@ -54,6 +54,67 @@ let lastWaveData = null;
 let lastWaveTime = 0;
 let useFallback = false;
 let fallbackOffset = 0;
+const pluginPanels = new Map();
+const pluginPanelHost = document.getElementById('plugin-panels');
+
+function upsertPluginPanel({ plugin, panel, status, reason }) {
+    if (!pluginPanelHost || !panel || typeof panel !== 'object') return;
+    const id = `${plugin}:${panel.id}`;
+    let node = pluginPanels.get(id);
+    if (!node) {
+        node = document.createElement('div');
+        node.className = 'plugin-panel';
+        const title = document.createElement('div');
+        title.className = 'plugin-panel-title';
+        const text = document.createElement('div');
+        text.className = 'plugin-panel-text';
+        node.appendChild(title);
+        node.appendChild(text);
+        pluginPanelHost.appendChild(node);
+        pluginPanels.set(id, node);
+        pluginPanelHost.style.display = 'flex';
+    }
+
+    const [title, text] = node.children;
+    title.textContent = status === 'blocked' ? `${panel.id}: blocked` : panel.title;
+    text.textContent = status === 'blocked'
+        ? `blocked: ${reason || 'unsafe panel payload'}`
+        : panel.text || '';
+}
+
+window.electronAPI.onPluginUI((payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    if (payload.type === 'panel.mount') {
+        if (payload.status === 'blocked') {
+            console.warn(`[PluginUI] blocked panel mount: ${payload.plugin} / ${payload.reason}`);
+            upsertPluginPanel({
+                plugin: payload.plugin,
+                panel: {
+                    id: payload.panelId || 'unknown',
+                    title: 'Panel blocked',
+                    text: payload.reason || 'blocked'
+                },
+                status: 'blocked',
+                reason: payload.reason
+            });
+            return;
+        }
+        if (payload.panel) {
+            upsertPluginPanel({
+                plugin: payload.plugin,
+                panel: payload.panel,
+                status: payload.status || 'ok'
+            });
+        }
+    }
+});
+
+window.electronAPI.onPluginStatus((status) => {
+    if (!status || typeof status !== 'object') return;
+    if (status.status === 'failed' || status.status === 'blocked') {
+        console.warn(`[PluginStatus] ${status.name}: ${status.reason || 'failed'}`);
+    }
+});
 
 window.electronAPI.onWaveUpdate((msg) => {
     if (msg.type === 'wave') {

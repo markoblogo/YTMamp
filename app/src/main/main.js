@@ -12,6 +12,7 @@ let bridge;
 let isQuitting = false;
 let pluginRuntime;
 const pluginRuntimeStatusQueue = [];
+const pluginRuntimeUiQueue = [];
 const playerStateBus = createEventBus({ dedupeWindowMs: 350 });
 const playerState = {
     track: null,
@@ -218,6 +219,25 @@ function queuePluginStatus(status) {
     emitPluginStatus(status);
 }
 
+function emitPluginUi(status) {
+    if (!mainWindow) return;
+    mainWindow.webContents.send('plugin-ui', status);
+}
+
+function queuePluginUi(status) {
+    if (!mainWindow) {
+        pluginRuntimeUiQueue.push(status);
+        return;
+    }
+    emitPluginUi(status);
+}
+
+function flushPluginUiQueue() {
+    while (pluginRuntimeUiQueue.length) {
+        emitPluginUi(pluginRuntimeUiQueue.shift());
+    }
+}
+
 function flushPluginStatusQueue() {
     while (pluginRuntimeStatusQueue.length) {
         emitPluginStatus(pluginRuntimeStatusQueue.shift());
@@ -240,6 +260,16 @@ function setupPlugins() {
                 console.error(`[Plugins] ${status.name}: ${status.reason || 'failed'}`);
             } else {
                 console.log(`[Plugins] ${status.name}: ${status.status}`);
+            }
+        },
+        onPluginUI: (status) => {
+            queuePluginUi(status);
+            if (status.type === 'panel.mount') {
+                if (status.status === 'blocked' || status.status === 'error') {
+                    console.warn(`[PluginsUI] ${status.plugin}: ${status.reason || status.error || 'panel mount blocked'}`);
+                } else {
+                    console.log(`[PluginsUI] panel.mount -> ${status.plugin}#${status.panelId}`);
+                }
             }
         }
     });
@@ -292,6 +322,7 @@ function createWindow() {
             });
         }
         flushPluginStatusQueue();
+        flushPluginUiQueue();
     });
 
     mainWindow.on('show', () => {

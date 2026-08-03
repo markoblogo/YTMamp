@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const KNOWN_PLUGIN_MANIFEST_EXTENSIONS = ['.plugin.json', '.json'];
+const PANEL_TITLE_MAX_LENGTH = 80;
+const PANEL_TEXT_MAX_LENGTH = 200;
+const PANEL_ID_PATTERN = /^[a-zA-Z0-9._-]{1,80}$/;
 
 function safeReadJson(filePath) {
     try {
@@ -67,16 +70,97 @@ function createSafeLogger(baseName, logger) {
     };
 }
 
-function createPluginContext(name, eventBus, logger) {
+function sanitizePanelPayload(payload, pluginName) {
+    if (!payload || typeof payload !== 'object') {
+        throw new Error(`Plugin "${pluginName}" passed invalid panel payload`);
+    }
+
+    const id = typeof payload.id === 'string' ? payload.id.trim() : '';
+    if (!PANEL_ID_PATTERN.test(id)) {
+        throw new Error(`Plugin "${pluginName}" panel id invalid`);
+    }
+
+    if (typeof payload.html === 'string' || typeof payload.css === 'string' || payload.dom === 'object') {
+        throw new Error(`Plugin "${pluginName}" panel payload contains unsafe DOM field`);
+    }
+
+    if (typeof payload.title !== 'undefined' && typeof payload.title !== 'string') {
+        throw new Error(`Plugin "${pluginName}" panel title must be a string`);
+    }
+    if (typeof payload.text !== 'undefined' && typeof payload.text !== 'string') {
+        throw new Error(`Plugin "${pluginName}" panel text must be a string`);
+    }
+
+    const text = (typeof payload.text === 'string' ? payload.text : '').slice(0, PANEL_TEXT_MAX_LENGTH).trim();
+
+    return {
+        id,
+        title: (typeof payload.title === 'string' ? payload.title : id).slice(0, PANEL_TITLE_MAX_LENGTH),
+        text
+    };
+}
+
+function safeJsonClone(value) {
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch (err) {
+        return value;
+    }
+}
+
+function createPluginContext(name, eventBus, logger, onPanelMountRequest) {
     const safeLogger = createSafeLogger(name, logger);
+    const safeHandlerCall = (handlerName, handler, payload) => {
+        try {
+            handler(payload);
+        } catch (err) {
+            safeLogger.error(`[handler:${handlerName}]`, err.message);
+        }
+    };
+
+    const safeSubscribe = (eventName, handler) => {
+        if (typeof handler !== 'function') {
+            throw new Error(`Handler for ${eventName} must be function`);
+        }
+        return eventBus.on(eventName, (payload) => safeHandlerCall(eventName, handler, safeJsonClone(payload)));
+    };
+
+    const requestPanelMount = (payload) => {
+        try {
+            const panel = sanitizePanelPayload(payload, name);
+            if (typeof onPanelMountRequest === 'function') {
+                return onPanelMountRequest({ plugin: name, type: 'panel.mount', panel });
+            }
+            return { status: 'unsupported', reason: 'Panel mounts are not supported' };
+        } catch (err) {
+            safeLogger.warn(`Blocking panel registration for "${name}": ${err.message}`);
+            if (typeof onPanelMountRequest === 'function') {
+                onPanelMountRequest({
+                    type: 'panel.mount',
+                    plugin: name,
+                    status: 'blocked',
+                    reason: err.message
+                });
+            }
+            return { status: 'blocked', reason: err.message };
+        }
+    };
 
     return {
         name,
         bus: eventBus,
-        onTrack: (handler) => eventBus.on('track', handler),
-        onState: (handler) => eventBus.on('state', handler),
-        subscribe: (eventName, handler) => eventBus.on(eventName, handler),
-        emit: (eventName, payload) => eventBus.emit(eventName, payload),
+        onTrack: (handler) => safeSubscribe('track', handler),
+        onState: (handler) => safeSubscribe('state', handler),
+        subscribe: (eventName, handler) => safeSubscribe(eventName, handler),
+        emit: (eventName, payload) => {
+            try {
+                return eventBus.emit(eventName, payload);
+            } catch (err) {
+                safeLogger.error(`emit failed for event "${eventName}": ${err.message}`);
+                return false;
+            }
+        },
+        mountPanel: (payload) => requestPanelMount(payload),
         log: {
             debug: (...args) => safeLogger.debug(...args),
             info: (...args) => safeLogger.info(...args),
@@ -123,6 +207,7 @@ function createPluginRuntime(options) {
         : [];
     const logger = options.logger || {};
     const onPluginStatus = options.onPluginStatus;
+    const onPluginUI = options.onPluginUI;
 
     const plugins = [];
 
@@ -154,7 +239,24 @@ function createPluginRuntime(options) {
                 throw new Error(`Entry "${pluginPath}" not found or not a .js file`);
             }
 
-            const api = createPluginContext(manifest.name, eventBus, logger);
+            const api = createPluginContext(manifest.name, eventBus, logger, (request) => {
+                if (request.type === 'panel.mount') {
+                    const uiPayload = {
+                        ...request,
+                        status: 'ok',
+                        panelId: request.panel && request.panel.id
+                    };
+                    if (typeof onPluginUI === 'function') onPluginUI(uiPayload);
+                    return {
+                        status: 'ok',
+                        type: request.type,
+                        panelId: request.panel && request.panel.id
+                    };
+                }
+                const uiPayload = { ...request, status: 'ok' };
+                if (typeof onPluginUI === 'function') onPluginUI(uiPayload);
+                return { status: 'ok' };
+            });
             const { dispose } = invokeInit(api, manifest, logger);
             const pluginState = {
                 name: manifest.name,
