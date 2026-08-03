@@ -37,6 +37,14 @@ Source: GitHub Actions matrix run
 - [ ] Toggle "Auto-show on play" while no active YouTube Music tab is connected.
 - [ ] Verify app remains connected state-safe when YTM tab closes ('Need YTM Tab').
 
+## Local Integration API checks
+
+- [ ] /status contract: 200 with canonical payload includes x-ytmamp-api-version, content-type: application/json; charset=utf-8, cache-control: no-store.
+- [ ] /current-track contract: 204 when empty, 200 with canonical payload when track exists.
+- [ ] /status and /current-track reject unsupported API versions with HTTP 400 and version error body.
+- [ ] /status and /current-track enforce local+token gates (401, 403) and return x-ytmamp-api-version.
+- [ ] /events and /obs return expected headers for negative and success paths (including CORS allowlist for OBS).
+
 ## Browser + playback checks (manual)
 
 - [ ] Chrome: extension connects and controls work for play/pause/next/prev/seek/volume/like/repeat/shuffle.

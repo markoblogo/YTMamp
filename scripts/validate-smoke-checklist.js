@@ -12,6 +12,7 @@ if (!contents || !contents.trim()) {
 const requiredMarkers = [
     '## Platform checks',
     '## Edge-case checks',
+    '## Local Integration API checks',
     '## Browser + playback checks',
     '- [ ]',
 ];

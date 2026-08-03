@@ -119,6 +119,7 @@ The local app/extension bridge is documented in [docs/protocol.md](docs/protocol
 
 ### Integration API
 Local HTTP integration endpoints are documented in [docs/integration-api.md](docs/integration-api.md).
+CI now requires the local API contract checklist (`/status`, `/current-track`, `/events`, `/obs`) to be present in `ci-smoke-checklist.md`.
 
 ### Browser support
 Tested Chromium browsers are documented in [docs/browser-support.md](docs/browser-support.md).

@@ -49,6 +49,7 @@ Published assets:
 - CI generates `ci-smoke-checklist.md` for each OS matrix job.
 - Artifact: `smoke-check-<os>-<sha>` is uploaded to workflow run.
 - Generated list contains detached tray/autostart edge-case scenarios required for manual QA.
+- A dedicated integration-API block tracks `/status`, `/current-track`, `/events`, and `/obs` contract checks (status matrix + auth/headers/rate-limit behavior).
 
 ## Known smoke constraints
 
