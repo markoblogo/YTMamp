@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Added
+- Documented Cardputer integration ownership boundary in `README.md`: YTMamp keeps remote control API/endpoint stability in this repo, while Cardputer-side playback UX, validation checks, and device integration are tracked in [Pocket-OS-Cardputer-ABV](https://github.com/markoblogo/Pocket-OS-Cardputer-ABV).
+
 ## [0.3.3] - 2026-08-03
 ### Added
 - Implemented local integration API contract baseline (`/status`, `/current-track`, `/events`) with versioned headers and auth/rate-limit behavior.
