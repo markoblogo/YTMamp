@@ -25,7 +25,7 @@ function isObsOriginAllowed(origin, allowlist) {
 
 function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: overrideIsLocalRequest = null, obsOriginAllowlist = [] } = {}) {
     const INTEGRATION_HOST = '127.0.0.1';
-    const INTEGRATION_PORT = 18990;
+    const INTEGRATION_PORT = 0;
     const MAX_SSE_CLIENTS = 2;
     const RATE_LIMIT_WINDOW_MS = 1000;
     const RATE_LIMIT_MAX_REQUESTS = 3;
@@ -224,7 +224,8 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
             if (!track) {
                 res.writeHead(204, {
                     ...integrationHeaders,
-                    'cache-control': 'no-store'
+                    'cache-control': 'no-store',
+                    'access-control-allow-origin': requestOrigin
                 });
                 res.end();
                 return;
@@ -313,7 +314,14 @@ function createSmokeIntegrationServer({ integrationToken = '', isLocalRequest: o
     return {
         server,
         INTEGRATION_HOST,
-        INTEGRATION_PORT,
+        get INTEGRATION_PORT() {
+            const address = server.address();
+            if (address && typeof address === 'object' && Number.isInteger(address.port)) {
+                return address.port;
+            }
+
+            return INTEGRATION_PORT;
+        },
         setTrack,
         setStatus,
         setState
@@ -420,6 +428,16 @@ async function requestEventsResponse({ serverUrl, path = '/events', headers = {}
             });
             res.on('end', () => finalize(result));
             res.on('close', () => finalize(result));
+            res.on('error', (error) => {
+                if (error.code === 'ECONNRESET') {
+                    finalize(result);
+                    return;
+                }
+
+                if (!settled) {
+                    reject(error);
+                }
+            });
 
             if (res.statusCode === 200) {
                 res.destroy();
@@ -592,7 +610,7 @@ test('streams snapshot on SSE events endpoint and exposes contract version heade
     await new Promise((resolve) => fixture.server.listen(fixture.INTEGRATION_PORT, fixture.INTEGRATION_HOST, resolve));
 
     try {
-        const { statusCode, headers } = await new Promise((resolve, reject) => {
+        const { statusCode, headers, body } = await new Promise((resolve, reject) => {
             const req = http.request(`http://${fixture.INTEGRATION_HOST}:${fixture.INTEGRATION_PORT}/events?token=test-token`, (res) => {
                 let body = '';
                 let done = false;

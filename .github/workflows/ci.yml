@@ -38,8 +38,17 @@ jobs:
         run: npm run lint
 
       - name: Test
+        run: node ../scripts/ci-smoke-summary.js
         working-directory: app
-        run: npm test
+
+      - name: Upload smoke summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-summary-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            app/ci-smoke-summary.md
+            app/ci-smoke-output.log
 
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js
