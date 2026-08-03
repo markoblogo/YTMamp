@@ -186,15 +186,19 @@ function broadcastIntegrationEvent(name, payload) {
 
 function setupIntegrationServer() {
     integrationServer = http.createServer((req, res) => {
+        const integrationBaseHeaders = {
+            'x-ytmamp-api-version': String(INTEGRATION_API_VERSION)
+        };
         try {
             if (!req.url) {
-                res.writeHead(400);
+                res.writeHead(400, integrationBaseHeaders);
                 res.end('bad request');
                 return;
             }
 
             if (!isLocalRequest(req)) {
                 res.writeHead(403, {
+                    ...integrationBaseHeaders,
                     'content-type': 'text/plain; charset=utf-8'
                 });
                 res.end('forbidden');
@@ -208,9 +212,9 @@ function setupIntegrationServer() {
 
             if (!isSupportedIntegrationApiVersion(apiVersion)) {
                 res.writeHead(400, {
+                    ...integrationBaseHeaders,
                     'content-type': 'application/json; charset=utf-8',
-                    'cache-control': 'no-store',
-                    'x-ytmamp-api-version': String(INTEGRATION_API_VERSION)
+                    'cache-control': 'no-store'
                 });
                 res.end(JSON.stringify({
                     v: INTEGRATION_API_VERSION,
@@ -223,6 +227,7 @@ function setupIntegrationServer() {
 
             if (!isAuthorizedIntegrationRequest(req, token)) {
                 res.writeHead(401, {
+                    ...integrationBaseHeaders,
                     'www-authenticate': 'Bearer realm="ytmamp-local"',
                     'content-type': 'text/plain; charset=utf-8'
                 });
@@ -233,6 +238,7 @@ function setupIntegrationServer() {
             const bucket = getRateBucket(parseRemoteIp(req));
             if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
                 res.writeHead(429, {
+                    ...integrationBaseHeaders,
                     'retry-after': String(getRetryAfterMs(bucket)),
                     'content-type': 'text/plain; charset=utf-8'
                 });
@@ -250,7 +256,10 @@ function setupIntegrationServer() {
 
             if (req.method === 'GET' && parsedUrl.pathname === '/current-track') {
                 if (!playerState.track) {
-                    res.writeHead(204, { 'cache-control': 'no-store' });
+                    res.writeHead(204, {
+                        ...integrationBaseHeaders,
+                        'cache-control': 'no-store'
+                    });
                     res.end();
                     return;
                 }
@@ -266,6 +275,7 @@ function setupIntegrationServer() {
             if (parsedUrl.pathname === '/events' && req.method === 'GET') {
                 if (integrationSseClients.size >= MAX_SSE_CLIENTS) {
                     res.writeHead(429, {
+                        ...integrationBaseHeaders,
                         'content-type': 'text/plain; charset=utf-8',
                         'retry-after': '1'
                     });
@@ -274,6 +284,7 @@ function setupIntegrationServer() {
                 }
 
                 res.writeHead(200, {
+                    ...integrationBaseHeaders,
                     'content-type': 'text/event-stream; charset=utf-8',
                     'cache-control': 'no-store',
                     connection: 'keep-alive',
@@ -287,6 +298,7 @@ function setupIntegrationServer() {
                 };
                 if (!validateIntegrationEventEnvelope(snapshotPayload)) {
                     res.writeHead(500, {
+                        ...integrationBaseHeaders,
                         'content-type': 'application/json; charset=utf-8',
                         'cache-control': 'no-store'
                     });
