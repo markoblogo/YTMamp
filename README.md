@@ -117,6 +117,9 @@ npm run dist:linux
 ### Protocol
 The local app/extension bridge is documented in [docs/protocol.md](docs/protocol.md).
 
+### Integration API
+Local HTTP integration endpoints are documented in [docs/integration-api.md](docs/integration-api.md).
+
 ### Browser support
 Tested Chromium browsers are documented in [docs/browser-support.md](docs/browser-support.md).
 
