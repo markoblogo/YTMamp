@@ -20,6 +20,9 @@ All notable changes to this project will be documented in this file.
 - Apply authentication to cast routes and replace reflected CORS origins with `CAST_ORIGIN_ALLOWLIST`.
 - Enable Electron renderer sandboxing, navigation blocking, and restrictive content security policies.
 
+### Fixed
+- Correct main-process paths for OBS and Last.fm modules so the Electron app starts from source and packaged builds.
+
 ## [0.3.3] - 2026-08-03
 ### Added
 - Implemented local integration API contract baseline (`/status`, `/current-track`, `/events`) with versioned headers and auth/rate-limit behavior.

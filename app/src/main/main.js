@@ -14,9 +14,8 @@ const {
     isAuthorizedRequest,
     parseOriginAllowlist
 } = require('./integration_security');
-require.extensions['.ts'] = require.extensions['.js'];
-const { createObsOverlayService } = require('./integrations/obs.ts');
-const { createLastFmScrobbler, DEFAULT_TRACK_THRESHOLD_SEC, DEFAULT_MIN_TRACK_DURATION_SEC } = require('./integrations/lastfm');
+const { createObsOverlayService } = require('../integrations/obs');
+const { createLastFmScrobbler, DEFAULT_TRACK_THRESHOLD_SEC, DEFAULT_MIN_TRACK_DURATION_SEC } = require('../integrations/lastfm');
 const {
     INTEGRATION_API_VERSION,
     getRequestedIntegrationApiVersion,
