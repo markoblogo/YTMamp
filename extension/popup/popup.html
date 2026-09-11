@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
     <link rel="stylesheet" href="popup.css">
 </head>
 
@@ -11,8 +12,7 @@
         <div id="title-bar">
             <div id="status-group">
                 <div id="status-led"></div>
-                <img src="../icons/icon32.png"
-                    style="width: 14px; height: 14px; margin-right: 4px; border: 1px solid #444; vertical-align: middle;">
+                <img id="header-icon" src="../icons/icon32.png" alt="">
                 <span id="header-title">YTMAMP</span>
             </div>
         </div>
@@ -33,13 +33,13 @@
 
             <div id="connect-area">
                 <button id="btn-connect" class="wa-button">CONNECT</button>
-                <button id="btn-disconnect" class="wa-button" style="display: none;">DISCONNECT</button>
+                <button id="btn-disconnect" class="wa-button">DISCONNECT</button>
             </div>
 
             <div id="bridge-token-area">
-                <label for="bridge-token">Bridge token (optional)</label>
+                <label for="bridge-token">Bridge token</label>
                 <div id="bridge-token-row">
-                    <input id="bridge-token" type="text" placeholder="Paste desktop token" maxlength="512"
+                    <input id="bridge-token" type="text" placeholder="Tray → Copy bridge token" maxlength="512"
                         autocomplete="off" spellcheck="false">
                     <button id="btn-save-token" class="wa-button">SAVE</button>
                 </div>
@@ -61,6 +61,7 @@
             </div>
 
             <div id="info-note">
+                <p>Copy the token from the desktop tray menu, paste it above, then save and connect.</p>
                 <p>Extension controls YTM, but the desktop app must be running (it lives in the menu bar).</p>
                 <p>Auto-connect only connects automatically; it does not start the app.</p>
             </div>

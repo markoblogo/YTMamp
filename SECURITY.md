@@ -1,12 +1,13 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+Only the latest YTMamp release receives security updates.
 
-Only the latest version of YTMamp is supported for security updates.
+## Network model
 
-## Local Communication
-YTMamp uses a local WebSocket server (`127.0.0.1:18765`) to communicate between the browser extension and the desktop app. This server is configured to only accept connections from `localhost`. No data is sent to external servers.
+The desktop-extension WebSocket bridge listens on `127.0.0.1:18765` and requires a per-install pairing token by default. The HTTP integration API listens on `127.0.0.1:18880` by default.
 
-## Reporting a Vulnerability
+LAN access is opt-in. A non-loopback `INTEGRATION_HOST` requires `INTEGRATION_TOKEN`, and browser-based cast clients require an explicit `CAST_ORIGIN_ALLOWLIST`. Optional Last.fm integration sends playback metadata to Last.fm only when configured.
 
-If you've found a security vulnerability, please report it via GitHub Issues or by contacting the maintainer directly. We aim to respond to all reports within 48 hours.
+## Report a vulnerability
+
+Please use GitHub's **Report a vulnerability** form in the repository Security tab. If private reporting is unavailable, contact the maintainer without publishing exploit details in a public issue.

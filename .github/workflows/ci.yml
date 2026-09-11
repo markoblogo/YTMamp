@@ -21,9 +21,9 @@ jobs:
           - ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -33,6 +33,10 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Audit dependencies
+        working-directory: app
+        run: npm audit --audit-level=high
+
       - name: Lint
         working-directory: app
         run: npm run lint
@@ -41,9 +45,13 @@ jobs:
         run: node ../scripts/ci-smoke-summary.js
         working-directory: app
 
+      - name: Package app
+        working-directory: app
+        run: npm run pack
+
       - name: Upload smoke summary artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-summary-${{ matrix.os }}-${{ github.sha }}
           path: |
@@ -61,7 +69,7 @@ jobs:
         run: node scripts/generate-pr-smoke-summary.js
 
       - name: Upload smoke checklist artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-check-${{ matrix.os }}-${{ github.sha }}
           path: ci-smoke-checklist.md

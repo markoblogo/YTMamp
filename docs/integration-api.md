@@ -2,23 +2,24 @@
 
 YTMamp exposes a local HTTP API for external integrations (obsidian tools, scripts, widgets).
 
-- Host: `0.0.0.0` by default (bind is LAN-visible; use `INTEGRATION_HOST` to override)
+- Host: `127.0.0.1` by default (local-only)
 - Default port: `18880`
 - Env vars:
-  - `INTEGRATION_HOST` — override bind host (default `0.0.0.0`)
+  - `INTEGRATION_HOST` — override bind host (default `127.0.0.1`); a non-loopback value requires `INTEGRATION_TOKEN`
   - `INTEGRATION_PORT` — override listening port (default `18880`)
-  - `INTEGRATION_TOKEN` — optional shared token (`Bearer`, `X-YTMAMP-Token`, or `?token=...`)
-  - `OBS_ORIGIN_ALLOWLIST` — comma-separated origins allowed to call `/obs` (for example `http://localhost:4455,https://studio.example.com`). Empty means deny all non-empty origins.
+  - `INTEGRATION_TOKEN` — shared token (`Bearer`, `X-YTMAMP-Token`, or compatibility-only `?token=...`)
+  - `OBS_ORIGIN_ALLOWLIST` — comma-separated browser origins allowed to call `/obs`.
+  - `CAST_ORIGIN_ALLOWLIST` — comma-separated browser origins allowed to call `/api/cast/*`. Empty allowlists deny browser-origin requests.
 
 ## Auth
 
-Requests must come from localhost (`127.0.0.1`) and pass optional token check:
+Loopback requests work without `INTEGRATION_TOKEN`. When a token is configured, every route requires it. A non-loopback bind fails at startup unless a token is configured:
 
 - header: `Authorization: Bearer <token>`
 - header: `X-YTMAMP-Token: <token>`
 - query: `?token=<token>`
 
-If `INTEGRATION_TOKEN` is not set, auth is disabled.
+Prefer headers because query tokens can be retained in logs and history. LAN requests require a valid token; the loopback-only default remains available without one.
 
 Responses:
 
@@ -224,14 +225,15 @@ Allowed response headers for valid OBS calls:
 
 ## Cardputer cast control (`/api/cast/*`)
 
-New minimal endpoints designed for local Wi‑Fi remote control without external auth at launch.
+Minimal endpoints for local or explicitly enabled LAN remote control. LAN mode requires a shared token.
 
 ### `GET /api/cast/status`
 
 Returns current playback snapshot for lightweight controllers (Cardputer, ESP, etc.).
 
 ```bash
-curl -s "http://<PC_IP>:18880/api/cast/status"
+curl -s -H "X-YTMAMP-Token: $INTEGRATION_TOKEN" \
+  "http://<PC_IP>:18880/api/cast/status"
 ```
 
 **Success (active track)**
@@ -268,6 +270,7 @@ Send commands:
 ```bash
 curl -X POST "http://<PC_IP>:18880/api/cast/cmd" \
   -H "Content-Type: application/json" \
+  -H "X-YTMAMP-Token: $INTEGRATION_TOKEN" \
   -d '{"action":"toggle"}'
 ```
 
@@ -301,11 +304,14 @@ Response headers for valid calls include:
 - `content-type: application/json; charset=utf-8`
 - `cache-control: no-store`
 - `x-ytmamp-api-version: 1`
-- `access-control-allow-origin: *` (or request `Origin` for browser clients)
+- `access-control-allow-origin: <allowed-origin>` for origins listed in `CAST_ORIGIN_ALLOWLIST`; non-browser clients receive no CORS header
 
 CORS preflight:
 
 ```bash
+CAST_ORIGIN_ALLOWLIST=http://cardputer.local \
+INTEGRATION_HOST=0.0.0.0 INTEGRATION_TOKEN=choose-a-long-secret npm start
+
 curl -X OPTIONS "http://<PC_IP>:18880/api/cast/cmd" \
   -H "Origin: http://cardputer.local" \
   -H "Access-Control-Request-Method: POST"
@@ -313,7 +319,7 @@ curl -X OPTIONS "http://<PC_IP>:18880/api/cast/cmd" \
 
 ### Cardputer integration flow (MVP)
 
-1. Discover/set PC IPv4 in Cardputer network settings.
+1. Start YTMamp with a non-loopback `INTEGRATION_HOST` and a strong `INTEGRATION_TOKEN`; configure the same PC address and token on Cardputer.
 2. Poll `GET /api/cast/status` on interval (for example every 2–3s) and render `track`.
 3. On hardware buttons, send `POST /api/cast/cmd` with JSON action:
    - Next: `{"action":"next"}`

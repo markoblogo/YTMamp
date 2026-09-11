@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'">
     <title>YTMamp - Installation Guide</title>
     <link rel="stylesheet" href="help.css">
 </head>
@@ -10,10 +11,10 @@
 <body>
     <div id="container">
         <div id="title-bar">
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <img src="icons/icon48.png" style="width: 24px; height: 24px;">
+            <div class="help-title-group">
+                <img class="help-icon-large" src="icons/icon48.png" alt="">
                 <span>INSTALLATION & USAGE GUIDE</span>
-                <img src="icons/icon16.png" style="width: 16px; height: 16px;">
+                <img class="help-icon-small" src="icons/icon16.png" alt="">
             </div>
         </div>
 
@@ -38,6 +39,7 @@
                     <li>Open <strong>YouTube Music</strong> in a supported Chromium browser tab.</li>
                     <li>Tested browsers: <strong>Chrome</strong>, <strong>Comet</strong>, and <strong>Atlas</strong>.</li>
                     <li>The extension will try to connect to the desktop app automatically.</li>
+                    <li>From the desktop tray menu choose <strong>Copy bridge token</strong>, paste it into the extension popup, then click <strong>Save</strong> and <strong>Connect</strong>.</li>
                     <li><strong>Important:</strong> "Auto-connect" only establishes the link; it <strong>does not
                             start</strong> the desktop app. You must launch the app manually.</li>
                 </ul>

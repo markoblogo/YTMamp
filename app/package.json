@@ -1,6 +1,6 @@
 {
   "name": "ytmamp",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Retro mini-player for YouTube Music with a Chromium extension bridge.",
   "author": {
     "name": "markoblogo",
@@ -24,14 +24,15 @@
     "lint": "node scripts/check-js.js",
     "test": "node --test && npm run test:smoke",
     "test:smoke": "node --test test/integration_api_smoke.test.js",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "pack": "npm run clean && electron-builder --dir --publish never"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "8.21.3"
   },
   "devDependencies": {
-    "electron": "^25.3.0",
-    "electron-builder": "^24.13.3"
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3"
   },
   "build": {
     "appId": "com.antonbiletskiy.ytmamp",
@@ -123,5 +124,8 @@
       "assets/**/*"
     ],
     "asar": true
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

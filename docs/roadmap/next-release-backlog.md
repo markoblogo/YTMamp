@@ -1,5 +1,7 @@
 # Next Release Plan: YTMamp (Next Iteration)
 
+> Historical planning snapshot for v0.3.3. Current release behavior and verification live in the root README, changelog, and smoke plan.
+
 Дата документа: 2026-08-03
 
 ## Цель релиза

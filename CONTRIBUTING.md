@@ -1,31 +1,27 @@
 # Contributing to YTMamp
 
-First off, thank you for considering contributing to YTMamp!
+## Set up
 
-## Development Setup
+```bash
+git clone https://github.com/markoblogo/YTMamp.git
+cd YTMamp/app
+npm ci
+npm run check
+npm start
+```
 
-1. **Clone the repo**:
-   ```bash
-   git clone https://github.com/your-username/YTMamp.git
-   cd YTMamp
-   ```
+To test the companion, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension/`.
 
-2. **Setup the App**:
-   ```bash
-   cd app
-   npm install
-   npm start
-   ```
+## Before a pull request
 
-3. **Setup the Extension**:
-   - Open Chrome/Brave/Edge and navigate to `chrome://extensions`.
-   - Enable **Developer mode**.
-   - Click **Load unpacked** and select the `extension/` directory.
+Run these checks from `app/`:
 
-## Rules
-- **No DRM Bypassing**: Do not submit features that attempt to bypass YouTube's DRM or skip ads in a way that violates their Terms of Service.
-- **Styling**: Keep the "Modern Retro" aesthetic (Black/Neon Green).
-- **Security**: All communication must remain on `localhost`.
+```bash
+npm run check
+npm audit --audit-level=high
+npm run pack
+```
 
-## Testing
-Please test your changes both in the development environment (`npm start`) and as a production build (`npm run dist`) before submitting a PR.
+Describe any interactive desktop/browser checks separately. A successful package build does not prove tray, media-key, browser, or playback behavior.
+
+Keep the black and neon-green compact interface, do not add DRM or ad-bypass behavior, and preserve the security invariants in [AGENTS.md](AGENTS.md). If a release version changes, update the app package, lockfile, and extension manifest together.
