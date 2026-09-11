@@ -2,9 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.4.0] - 2026-09-11
+
 ### Added
-- Documented Cardputer integration ownership boundary in `README.md`: YTMamp keeps remote control API/endpoint stability in this repo, while Cardputer-side playback UX, validation checks, and device integration are tracked in [Pocket-OS-Cardputer-ABV](https://github.com/markoblogo/Pocket-OS-Cardputer-ABV).
+- Packaged the Chromium companion as a versioned release ZIP.
+- Added a tray action to copy the generated bridge token and an explicit extension pairing flow.
+- Added CI packaging checks and dependency audits on macOS, Windows, and Linux.
+- Documented the Cardputer ownership boundary: YTMamp maintains the remote API while device UX and validation live in [Pocket-OS-Cardputer-ABV](https://github.com/markoblogo/Pocket-OS-Cardputer-ABV).
+
+### Changed
+- Made the HTTP integration API loopback-only by default.
+- Updated Electron, electron-builder, ws, and GitHub Actions.
+- Synchronized desktop and extension versions and refreshed installation, contribution, security, and API documentation.
+
+### Security
+- Require `INTEGRATION_TOKEN` when the HTTP API binds beyond loopback.
+- Apply authentication to cast routes and replace reflected CORS origins with `CAST_ORIGIN_ALLOWLIST`.
+- Enable Electron renderer sandboxing, navigation blocking, and restrictive content security policies.
 
 ## [0.3.3] - 2026-08-03
 ### Added

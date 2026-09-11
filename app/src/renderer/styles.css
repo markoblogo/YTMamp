@@ -49,6 +49,22 @@ body {
     font-size: 9px;
 }
 
+#status-group {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+#vol-status {
+    font-size: 8px;
+    color: #555;
+}
+
+#volume-label {
+    font-size: 8px;
+}
+
 #close-btn {
     -webkit-app-region: no-drag;
     cursor: pointer;

@@ -23,10 +23,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -46,20 +46,51 @@ jobs:
         working-directory: app
         run: npm run ${{ matrix.script }}
 
-      - name: Publish Release Assets
+      - name: Collect release assets
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-from-tag
-          fi
-
           shopt -s nullglob
           files=(app/dist/*.dmg app/dist/*.zip app/dist/*.exe app/dist/*.AppImage app/dist/*.deb)
           if [ ${#files[@]} -eq 0 ]; then
             echo "No release assets found"
             exit 1
           fi
+          mkdir release-assets
+          cp "${files[@]}" release-assets/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ runner.os }}
+          path: release-assets/*
+          if-no-files-found: error
 
-          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Package extension
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cd extension
+          zip -r "../YTMamp-${version}-extension.zip" .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-extension
+          path: YTMamp-*-extension.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [build, extension]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create release and publish assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes-from-tag
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY"

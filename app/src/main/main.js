@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, clipboard, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -8,6 +8,12 @@ const { createBridgeServer, sanitizeTrackMessage, validateMessage } = require('.
 const { createEventBus } = require('./event_bus');
 const { createPluginRuntime } = require('./plugin_runtime');
 const { configurePlayerCastBridge, playerGetState, playerAction } = require('./playerCastBridge');
+const {
+    assertSafeIntegrationConfig,
+    getCastCorsHeaders,
+    isAuthorizedRequest,
+    parseOriginAllowlist
+} = require('./integration_security');
 require.extensions['.ts'] = require.extensions['.js'];
 const { createObsOverlayService } = require('./integrations/obs.ts');
 const { createLastFmScrobbler, DEFAULT_TRACK_THRESHOLD_SEC, DEFAULT_MIN_TRACK_DURATION_SEC } = require('./integrations/lastfm');
@@ -37,8 +43,13 @@ const stateEventDedupWindowMs = 350;
 const localTrustEnabled = ['1', 'true', 'yes', 'on'].includes((process.env.LOCAL_TRUST || '').toLowerCase());
 const envBridgeToken = (process.env.BRIDGE_TOKEN || '').trim();
 const integrationEnvToken = (process.env.INTEGRATION_TOKEN || '').trim();
-const INTEGRATION_HOST = process.env.INTEGRATION_HOST || '0.0.0.0';
+const INTEGRATION_HOST = process.env.INTEGRATION_HOST || '127.0.0.1';
 const INTEGRATION_PORT = Number(process.env.INTEGRATION_PORT) || 18880;
+const CAST_ORIGIN_ALLOWLIST = parseOriginAllowlist(process.env.CAST_ORIGIN_ALLOWLIST || '');
+const integrationNetworkPolicy = assertSafeIntegrationConfig({
+    host: INTEGRATION_HOST,
+    token: integrationEnvToken
+});
 const OBS_ORIGIN_ALLOWLIST = parseEnvOriginList(process.env.OBS_ORIGIN_ALLOWLIST || '');
 const LASTFM_ENABLED = ['1', 'true', 'yes', 'on'].includes((process.env.LASTFM_ENABLED || '').toLowerCase());
 const LASTFM_TRACK_THRESHOLD_SEC = Number.parseInt(process.env.LASTFM_TRACK_THRESHOLD_SEC || '', 10) || DEFAULT_TRACK_THRESHOLD_SEC;
@@ -209,16 +220,14 @@ function isCastApiPath(pathname = '') {
 }
 
 function formatCastResponse(res, statusCode, payload, req, extraHeaders = {}) {
-    const origin = (req && req.headers && typeof req.headers.origin === 'string' && req.headers.origin.trim()) || '*';
+    const origin = req && req.headers && req.headers.origin;
+    const corsHeaders = getCastCorsHeaders(origin, CAST_ORIGIN_ALLOWLIST) || {};
     const body = JSON.stringify(payload);
     res.writeHead(statusCode, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
         'x-ytmamp-api-version': String(INTEGRATION_API_VERSION),
-        'access-control-allow-origin': origin,
-        'access-control-allow-methods': 'GET, POST, OPTIONS',
-        'access-control-allow-headers': 'Content-Type, X-YTMAMP-Token',
-        'vary': 'Origin',
+        ...corsHeaders,
         ...extraHeaders,
         'content-length': Buffer.byteLength(body)
     });
@@ -257,14 +266,6 @@ function readJsonBody(req) {
 
         req.on('error', reject);
     });
-}
-
-function isAuthorizedIntegrationRequest(req, queryToken) {
-    if (!integrationEnvToken) return true;
-    const headerToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-    const xToken = (req.headers['x-ytmamp-token'] || '').trim();
-    const token = queryToken || headerToken || xToken;
-    return token === integrationEnvToken;
 }
 
 function getRateBucket(ip) {
@@ -371,17 +372,22 @@ function setupIntegrationServer() {
                     return;
                 }
 
+                const castCorsHeaders = getCastCorsHeaders(req.headers.origin, CAST_ORIGIN_ALLOWLIST);
+                if (castCorsHeaders === null) {
+                    res.writeHead(403, {
+                        ...integrationBaseHeaders,
+                        'content-type': 'text/plain; charset=utf-8'
+                    });
+                    res.end('forbidden origin');
+                    return;
+                }
+
                 if (req.method === 'OPTIONS') {
-                    const origin = (req.headers.origin || '*').trim();
-                    const preflightHeaders = {
-                        'content-type': 'text/plain; charset=utf-8',
-                        'access-control-allow-origin': origin || '*',
-                        'access-control-allow-methods': 'GET, POST, OPTIONS',
-                        'access-control-allow-headers': 'Content-Type, X-YTMAMP-Token',
-                        'access-control-max-age': '300',
-                        'vary': 'Origin'
-                    };
-                    res.writeHead(204, { ...integrationBaseHeaders, ...preflightHeaders });
+                    res.writeHead(204, {
+                        ...integrationBaseHeaders,
+                        ...castCorsHeaders,
+                        'access-control-max-age': '300'
+                    });
                     res.end();
                     return;
                 }
@@ -414,7 +420,7 @@ function setupIntegrationServer() {
                 return;
             }
 
-            if (!isCastApi && !isAuthorizedIntegrationRequest(req, token)) {
+            if (!isAuthorizedRequest(req, token, integrationEnvToken)) {
                 res.writeHead(401, {
                     ...integrationBaseHeaders,
                     'www-authenticate': 'Bearer realm="ytmamp-local"',
@@ -679,6 +685,7 @@ function setupIntegrationServer() {
 
     integrationServer.listen(INTEGRATION_PORT, INTEGRATION_HOST, () => {
         console.log(`[LocalAPI] listening on http://${INTEGRATION_HOST}:${INTEGRATION_PORT}`);
+        console.log(`[LocalAPI] LAN access: ${integrationNetworkPolicy.lanEnabled ? 'enabled with token auth' : 'disabled'}`);
         console.log('[LocalAPI] endpoints: /status, /current-track, /events, /obs, /api/cast/status, /api/cast/cmd');
     });
 }
@@ -917,9 +924,12 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
         },
     });
 
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
     mainWindow.once('ready-to-show', () => {
@@ -963,6 +973,10 @@ function updateTrayMenu() {
         { label: 'YTMamp', enabled: false },
         { type: 'separator' },
         { label: 'Show/Hide', click: () => toggleWindow() },
+        {
+            label: 'Copy bridge token',
+            click: () => clipboard.writeText(getExpectedAuthToken())
+        },
         {
             label: 'Start at login',
             type: 'checkbox',

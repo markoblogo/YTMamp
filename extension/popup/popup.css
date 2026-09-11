@@ -45,6 +45,18 @@ body {
     gap: 8px;
 }
 
+#header-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    border: 1px solid #444;
+    vertical-align: middle;
+}
+
+#btn-disconnect {
+    display: none;
+}
+
 #status-led {
     width: 8px;
     height: 8px;

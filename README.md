@@ -1,161 +1,82 @@
 # YTMamp
+
+[![CI](https://github.com/markoblogo/YTMamp/actions/workflows/ci.yml/badge.svg)](https://github.com/markoblogo/YTMamp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/markoblogo/YTMamp?display_name=tag&sort=semver)](https://github.com/markoblogo/YTMamp/releases/latest)
-[![Build](https://github.com/markoblogo/YTMamp/actions/workflows/release.yml/badge.svg)](https://github.com/markoblogo/YTMamp/actions/workflows/release.yml)
 [![License](https://img.shields.io/github/license/markoblogo/YTMamp)](LICENSE)
 
-**License:** MIT. See [LICENSE](LICENSE).
+A compact retro remote for YouTube Music. The desktop app stays above your work while a Chromium companion controls the active YouTube Music tab.
 
-**YTMamp** is a lightweight, retro-inspired mini-player for YouTube Music on desktop. It pairs a high-performance Electron application with a specialized Chromium browser extension to give you seamless control over your music without ever leaving your workflow.
-
-## Demo
 [![YTMamp demo video](https://img.youtube.com/vi/fHRDm8e2n-U/maxresdefault.jpg)](https://youtu.be/fHRDm8e2n-U)
-
-### Download
-Get the latest desktop build from [GitHub Releases](https://github.com/markoblogo/YTMamp/releases/latest):
-- macOS: `YTMamp-*-mac.dmg`
-- Windows: `YTMamp-*-win.exe` or `YTMamp-*-win.zip`
-- Linux: `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb`
-
-Package status:
-- macOS/Windows/Linux smoke checks are completed for v0.3.3.
-- v0.3.3 includes integration API hardening, Last.fm scrobbling, and OBS overlay; Discord hotkeys/profiles are out of this release scope.
-
-### Verified matrix
-
-- OS: macOS 14.x, Windows 11, Ubuntu 24.04
-- Browsers: Chrome, Comet, Atlas
 
 > [!NOTE]
 > YTMamp is an independent open-source project and is not affiliated with Google or YouTube.
 
----
+## What it does
 
-## Features
-- **Retro Aesthetic**: Modern take on classic player designs with neon green accents.
-- **Always on Top**: Keeps your controls accessible while you work.
-- **Waveform Visualizer**: Real-time oscilloscope driven by your music.
-- **Expanded Controls**: Play/pause, previous, next, seek, volume, like, shuffle, and repeat.
-- **Native Experience**: System tray integration, "Start at login" support, and global media keys.
-- **Auto-pilot**: Automatically hides the native YTM mini-player and can auto-show itself on playback.
+- Play, pause, skip, seek, change volume, like, shuffle, and repeat.
+- Show track metadata and a live oscilloscope in a 360 × 116 always-on-top window.
+- Integrate with system tray controls, media keys, startup settings, Last.fm, OBS, and a versioned local API.
+- Run on macOS, Windows, and Linux with a Manifest V3 companion for Chromium browsers.
 
----
+## Download
 
-## 🛠 Installation
+Download the latest files from [GitHub Releases](https://github.com/markoblogo/YTMamp/releases/latest):
 
-### macOS
-1. **Download the latest DMG** from the [GitHub Releases](https://github.com/markoblogo/YTMamp/releases).
-2. **Install**: Open the `.dmg` and drag **YTMamp** to your `Applications` folder.
-> [!IMPORTANT]
-> The DMG is an installer. Once installed, launch YTMamp from your **Applications** folder, not from the mounted disk image.
-3. **Launch**: Open YTMamp. You'll see a green icon in your menu bar.
+| Platform | File |
+| --- | --- |
+| macOS | `YTMamp-*-mac.dmg` or `.zip` |
+| Windows | `YTMamp-*-win.exe` or `.zip` |
+| Linux | `YTMamp-*-linux.AppImage` or `.deb` |
+| Chromium extension | `YTMamp-*-extension.zip` (v0.4.0+) |
 
-### Windows
-1. Download `YTMamp-*-win.exe` from [GitHub Releases](https://github.com/markoblogo/YTMamp/releases).
-2. Run the installer and launch **YTMamp** from the Start menu.
-3. You should see the YTMamp icon in the system tray.
+Release builds are currently unsigned and not notarized. Your operating system may ask you to confirm the first launch.
 
-Portable option: download `YTMamp-*-win.zip`, extract it, and run the app from the extracted folder.
+## Set up in five steps
 
-### Linux
-1. Download either `YTMamp-*-linux.AppImage` or `YTMamp-*-linux.deb` from [GitHub Releases](https://github.com/markoblogo/YTMamp/releases).
-2. For AppImage: make it executable, then run it.
-   ```bash
-   chmod +x YTMamp-*-linux.AppImage
-   ./YTMamp-*-linux.AppImage
-   ```
-3. For Debian/Ubuntu:
-   ```bash
-   sudo apt install ./YTMamp-*-linux.deb
-   ```
+1. Install and launch the desktop app. It remains available from the menu bar or system tray.
+2. Extract the extension ZIP. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted folder.
+3. In the YTMamp tray menu choose **Copy bridge token**. Paste it into the extension popup and select **Save** and **Connect**.
+4. Open [YouTube Music](https://music.youtube.com) and click once in the page so the browser can start audio capture for the waveform.
+5. Pin the extension for quick access. Install it separately in every browser profile you use.
 
-Linux tray visibility depends on the desktop environment and AppIndicator/system tray support.
+Tested browser families and known limitations are listed in [browser support](docs/browser-support.md).
 
-### 🧩 Browser Extension Setup
-Currently, the extension is installed in "Unpacked" mode:
-1. Open a supported Chromium browser. Tested: **Chrome**, **Comet**, **Atlas**.
-2. Navigate to `chrome://extensions`.
-3. Enable **Developer mode** in the top right.
-4. Click **Load unpacked** and select the `extension/` folder from this directory.
-5. **Pin it**: Click the puzzle icon in your toolbar and pin YTMamp for quick access.
+## Platform notes
 
-Extensions are installed per browser/profile. If you use Comet, Atlas, and Chrome, install it in each browser/profile as needed.
+- **macOS:** open the DMG and drag YTMamp to Applications. Launch it from Applications, not the mounted image.
+- **Windows:** use the installer or extract the portable ZIP.
+- **Linux:** install the DEB, or mark the AppImage executable with `chmod +x`. Tray support depends on the desktop environment.
 
-Browser support notes: [docs/browser-support.md](docs/browser-support.md).
----
+If the extension reports a missing receiver after an update, refresh the YouTube Music tab. If the waveform is empty, click once inside that tab. If pairing fails, confirm the desktop app is running and copy the current token again.
 
-## 🚀 Getting Started Checklist
-1. Open [YouTube Music](https://music.youtube.com).
-2. Click **anywhere** on the page once (required by browsers to allow audio capturing for the waveform).
-3. Ensure the status indicator in YTMamp (or the extension popup) shows **Connected**.
-4. Play some music and enjoy!
+## Privacy and network access
 
----
+The desktop bridge and HTTP API listen on the local machine by default. The extension runs only on `music.youtube.com` and stores its bridge token in the browser profile. Last.fm is disabled unless credentials are configured.
 
-## 🔍 Troubleshooting
-- **"Receiving end does not exist"**: If you just updated the extension, refresh your YouTube Music tab.
-- **No Waveform**: Make sure you've clicked inside the YTM tab at least once since opening it.
-- **Not Connecting**: Ensure the YTMamp desktop app is running and check the tray/menu bar icon.
+LAN integrations are opt-in. Setting `INTEGRATION_HOST` to a non-loopback address requires `INTEGRATION_TOKEN`; browser controllers also require an explicit `CAST_ORIGIN_ALLOWLIST`. See the [integration API](docs/integration-api.md) and [bridge protocol](docs/protocol.md).
 
----
+## Develop
 
-## 🛠 For Developers
+Requires Node.js 22.12 or newer; CI uses Node.js 24.
 
-### Local Setup
 ```bash
-# Setup the desktop app
-cd app
-npm install
+git clone https://github.com/markoblogo/YTMamp.git
+cd YTMamp/app
+npm ci
 npm run check
-npm start
-
-# For platform builds
-npm run dist:mac
-npm run dist:win
-npm run dist:linux
+npm audit --audit-level=high
+npm run pack
 ```
 
-### Protocol
-The local app/extension bridge is documented in [docs/protocol.md](docs/protocol.md).
+`npm start` launches the desktop app. Platform installers are built with `npm run dist:mac`, `npm run dist:win`, or `npm run dist:linux`.
 
-### Integration API
-Local HTTP integration endpoints are documented in [docs/integration-api.md](docs/integration-api.md).
-CI now requires the local API contract checklist (`/status`, `/current-track`, `/events`, `/obs`) to be present in `ci-smoke-checklist.md`.
+CI checks lint, tests, dependency audit, and an unpacked app package on macOS, Windows, and Ubuntu. Interactive desktop/browser checks remain separate in the [release smoke plan](docs/smoke-test.md).
 
-### Cardputer integration (work in progress)
-YTMamp now provides the remote control API contracts (`/api/cast/status`, `/api/cast/cmd`, plus existing local API endpoints).  
-Remote player integration on Cardputer is implemented and tested in a separate repository:
-- [Pocket-OS-Cardputer-ABV](https://github.com/markoblogo/Pocket-OS-Cardputer-ABV) (Cast client, status polling, controls, diagnostics docs, and next implementation steps are tracked there).
+## Integrations
 
-Current phase status:
-- YTMamp: API contract and endpoint stability hardening (done in this repo).
-- Cardputer: device-side smoke checks, UX refinements, and end-to-end behavior verification (tracked in the Cardputer thread/repo).
+- [Local HTTP API](docs/integration-api.md): status, current track, event stream, OBS overlay, and remote controls.
+- [Local WebSocket protocol](docs/protocol.md): authenticated desktop-to-extension bridge.
+- [Pocket-OS Cardputer](https://github.com/markoblogo/Pocket-OS-Cardputer-ABV): device-side remote client and validation.
+- Last.fm scrobbling: opt-in environment configuration documented in the integration API.
 
-### Browser support
-Tested Chromium browsers are documented in [docs/browser-support.md](docs/browser-support.md).
-
-### Release QA
-Release smoke testing is tracked in [docs/smoke-test.md](docs/smoke-test.md).
-
-### Cross-platform notes
-Windows/Linux packaging and tray/autostart checks are tracked in [docs/cross-platform.md](docs/cross-platform.md).
-
-### Build Releases Locally
-To generate platform release artifacts on your own machine:
-```bash
-cd app
-npm run dist:mac    # macOS DMG + ZIP
-npm run dist:win    # Windows NSIS installer + ZIP
-npm run dist:linux  # Linux AppImage + DEB
-```
-Find your builds in `app/dist/`.
-
-Release builds are produced by GitHub Actions on matching runners: macOS, Windows, and Ubuntu.
-
----
-
-## 📄 License
-Distributed under the MIT License. See `LICENSE` for more information.
-
-### 📌 Roadmap
-
-See [next release backlog](docs/roadmap/next-release-backlog.md) for the 2-sprint plan and import artifacts.
+Contributions are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md). YTMamp is available under the [MIT License](LICENSE).

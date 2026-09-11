@@ -1,70 +1,12 @@
-# Cross-platform release notes
+# Cross-platform packaging
 
-YTMamp v0.3.x adds first-class packaging targets for macOS, Windows, and Linux.
+YTMamp targets macOS, Windows, and Linux. GitHub Actions builds each desktop format on its native runner and publishes the Chromium extension as a separate ZIP.
 
-## Release assets
+| Platform | Release assets | Runtime checks still required |
+| --- | --- | --- |
+| macOS | DMG, ZIP | Gatekeeper launch, menu bar, media keys, login item |
+| Windows | NSIS EXE, ZIP | SmartScreen launch, tray, media keys, startup |
+| Linux | AppImage, DEB | launch, tray/AppIndicator, media keys, autostart |
+| Chromium | extension ZIP | load unpacked, token pairing, YouTube Music control |
 
-Expected assets for a `v0.3.x` release:
-
-- `YTMamp-${VERSION}-mac.dmg`
-- `YTMamp-${VERSION}-mac.zip`
-- `YTMamp-${VERSION}-win.exe`
-- `YTMamp-${VERSION}-win.zip`
-- `YTMamp-${VERSION}-linux.AppImage`
-- `YTMamp-${VERSION}-linux.deb`
-
-## Platform smoke checklist
-
-CI verifies install/lint/test and release packaging. Tray behavior, autostart, and browser-extension connectivity still need a real desktop session per OS.
-
-### macOS
-
-- DMG opens and installs into `/Applications`.
-- Menu bar tray icon appears.
-- Tray menu can show/hide and quit the app.
-- Start at login toggle persists and applies through Electron login item settings.
-- App connects to the unpacked extension in a tested Chromium browser.
-
-### Windows
-
-- NSIS installer completes and creates Start menu entry.
-- ZIP build launches after extraction.
-- System tray icon appears.
-- Tray menu can show/hide and quit the app.
-- Start at login toggle persists and applies through Electron login item settings.
-- App connects to the unpacked extension in a tested Chromium browser.
-
-### Linux
-
-- AppImage launches after `chmod +x`.
-- DEB installs and launches on Ubuntu/Debian.
-- Tray icon appears on desktops with tray/AppIndicator support.
-- Tray menu can show/hide and quit the app.
-- Start at login creates/removes `~/.config/autostart/ytmamp.desktop`.
-- App connects to the unpacked extension in a tested Chromium browser.
-
-## Notes
-
-- Linux tray behavior depends on the desktop environment. GNOME setups may need AppIndicator support.
-- Linux autostart uses the XDG autostart desktop entry path rather than Electron login item settings.
-- Browser extension setup remains unpacked and per browser profile.
-
-## v0.3.2 stabilization status
-
-- Desktop smoke checks completed on macOS, Windows 11 and Ubuntu 24.04.
-- Tray/menu behavior, autostart persistence and window placement checks passed.
-- Verified Chromium browser set: Chrome, Comet, Atlas.
-
-## v0.3.2 checklist automation
-
-- CI now emits `ci-smoke-checklist.md` per matrix OS and uploads it as an artifact.
-- Edge-case cases added for autostart toggling while detached/minimized and repeated close/reopen cycles.
-
-## v0.3.3 hardening prep
-
-- Added CI smoke-check enforcement so `ci-smoke-checklist.md` must be generated in matrix jobs.
-- Added automated PR-surface smoke summary artifact flow:
-  - `scripts/generate-pr-smoke-summary.js`
-  - `scripts/update-pr-description.js`
-  - CI updates PR description on macOS matrix completion (best effort).
-- Prepared deterministic socket reconnection in extension background with heartbeat and bounded exponential retry.
+CI validates an unpacked Electron package on all three desktop runners. This catches packaging failures but does not replace the interactive checks above. Release builds are unsigned and not notarized.

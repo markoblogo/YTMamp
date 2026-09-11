@@ -8,7 +8,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 Use npm in the `app` directory:
 
-- Install: `npm install`
+- Install: `npm ci`
 
 ### Run the app in development
 
@@ -31,6 +31,10 @@ Artifacts will be written to `dist/` using the configuration under the `build` k
 - Syntax check: `npm run lint`
 - Unit/integration tests: `npm test`
 - Combined local check: `npm run check`
+- Dependency audit: `npm audit --audit-level=high`
+- Current-platform package check: `npm run pack`
+
+Keep the security invariants in the root `AGENTS.md`: loopback by default, a required token for LAN access, explicit browser-origin allowlists, authenticated bridge pairing, and Electron renderer isolation.
 
 ## Architecture overview
 
