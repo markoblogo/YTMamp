@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Correct main-process paths for OBS and Last.fm modules so the Electron app starts from source and packaged builds.
+- Disable the bundled Track Logger development sample so its panel does not cover playback controls.
 
 ## [0.3.3] - 2026-08-03
 ### Added
