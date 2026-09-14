@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-09-14
+
+### Added
+- Published a machine-readable v1 Cardputer integration contract for Pocket OS.
+- Added a regression test that keeps the contract aligned with the implemented cast routes, actions, token header, and API version.
+
 ## [0.4.0] - 2026-09-11
 
 ### Added
