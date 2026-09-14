@@ -226,6 +226,7 @@ Allowed response headers for valid OBS calls:
 ## Cardputer cast control (`/api/cast/*`)
 
 Minimal endpoints for local or explicitly enabled LAN remote control. LAN mode requires a shared token.
+The machine-readable [Cardputer contract](cardputer-contract.v1.json) is the stable source for compatible device clients.
 
 ### `GET /api/cast/status`
 
