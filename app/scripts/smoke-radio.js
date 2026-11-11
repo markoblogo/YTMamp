@@ -56,11 +56,11 @@ async function run(window) {
     assert.equal(await evaluate('document.getElementById("radio-frequency").textContent.startsWith("101.3 MHz")'), true);
     await evaluate('document.getElementById("radio-record").click()');
     await waitFor(() => record?.byteLength > 0, 'PCM worklet recording');
-    const bytesBefore = fs.statSync(fs.readdirSync(temporary).filter((name) => name.startsWith('radio-recording-')).map((name) => path.join(temporary, name))[0]).size;
+    const bytesBefore = fs.statSync(fs.readdirSync(temporary).filter((name) => /^radio-recording-[a-f0-9]{24}\.wav$/.test(name)).map((name) => path.join(temporary, name))[0]).size;
     assert.ok(bytesBefore > 44);
     await evaluate('document.getElementById("radio-record-pause").click()');
     await waitFor(() => evaluate('document.getElementById("radio-record-pause").textContent === "REC"'), 'pause recording');
-    const temporaryRecording = fs.readdirSync(temporary).find((name) => name.startsWith('radio-recording-'));
+    const temporaryRecording = fs.readdirSync(temporary).find((name) => /^radio-recording-[a-f0-9]{24}\.wav$/.test(name));
     const pausedBytes = fs.statSync(path.join(temporary, temporaryRecording)).size;
     await new Promise((resolve) => setTimeout(resolve, 300));
     assert.equal(fs.statSync(path.join(temporary, temporaryRecording)).size, pausedBytes);

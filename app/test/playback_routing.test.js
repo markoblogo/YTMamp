@@ -133,3 +133,25 @@ test('hide keeps local audio running; tray restore and YouTube auto-show respect
     fixture.bridgeOptions.onMessage({ v: 1, type: 'cmd', cmd: 'showWindow' });
     assert.equal(fixture.visible(), true);
 });
+
+test('radio stays isolated from inactive sources and untrusted frames; hide preserves the stream', async (t) => {
+    const fixture = await appFixture(t);
+    vm.runInContext('radioLibrary.stations.set("c".repeat(64), {id:"c".repeat(64),name:"Radio Test",url:"https://example.org/stream",region:"Local",countrycode:"FR",genre:"jazz"})', fixture.context);
+    const action = fixture.handlers.get('radio-action');
+    const invalid = { ...fixture.event, senderFrame: { url: 'https://example.com' } };
+    assert.ok((await action(invalid, 'record', { action: 'start' })).error);
+    fixture.handlers.get('set-source')(fixture.event, 'radio');
+    assert.equal((await action(fixture.event, 'play', { id: 'c'.repeat(64) })).ok, true);
+    vm.runInContext('radioPlayer.receive({id:radioPlayer.id,revision:radioPlayer.revision,playing:true})', fixture.context);
+    assert.equal(fixture.snapshot().track.title, 'Radio Test');
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'track', title: 'Inactive YouTube', artist: 'YT' });
+    assert.equal(fixture.snapshot().track.title, 'Radio Test');
+    const before = fixture.messages.filter((m) => m.name === 'radio-audio-command').length;
+    fixture.handlers.get('hide-window')(fixture.event);
+    assert.equal(fixture.snapshot().state.playing, true);
+    assert.equal(fixture.messages.filter((m) => m.name === 'radio-audio-command').length, before);
+    fixture.handlers.get('set-source')(fixture.event, 'local');
+    assert.equal(fixture.messages.filter((m) => m.name === 'radio-audio-command').at(-1).value.action, 'pause');
+    assert.equal(fixture.snapshot().track.title, 'First');
+    assert.equal(fixture.snapshot().state.playing, false);
+});

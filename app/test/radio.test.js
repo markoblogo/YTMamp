@@ -78,3 +78,16 @@ test('recording writes bounded stereo PCM WAV, pause excludes samples, Save copi
     const destination = path.join(directory, 'saved.wav'); await recorder.save(destination);
     assert.equal(recorder.pending, null); assert.equal(fs.existsSync(pending.file), false); assert.equal(fs.statSync(destination).size, 60);
 });
+
+test('an interrupted or canceled recording is recovered with a repaired WAV header', async (t) => {
+    const { directory } = fixture(t); const recorder = new RadioRecorder({ directory });
+    recorder.start('Recovery'); recorder.chunk(new Float32Array([0.5, -0.5, 1, -1]).buffer);
+    const original = recorder.recording.file;
+    fs.closeSync(recorder.recording.fd); recorder.recording = null; // Simulated process termination before header finalization.
+    const recovered = new RadioRecorder({ directory });
+    assert.equal(recovered.pending.file, original); assert.equal(recovered.pending.bytes, 8);
+    assert.equal(fs.readFileSync(original).readUInt32LE(40), 8);
+    assert.throws(() => recovered.start('Another'));
+    recovered.discard(); assert.equal(fs.existsSync(original), false);
+    assert.equal(new RadioRecorder({ directory }).pending, null);
+});
