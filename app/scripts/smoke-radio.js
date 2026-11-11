@@ -68,7 +68,7 @@ async function run(window) {
     await evaluate('document.getElementById("radio-record-pause").click()');
     await waitFor(() => fs.statSync(path.join(temporary, temporaryRecording)).size > pausedBytes, 'resume recording');
     await evaluate('document.getElementById("radio-record-stop").click()');
-    await waitFor(() => fs.existsSync(output), 'save WAV');
+    await waitFor(async () => fs.existsSync(output) && await evaluate('document.getElementById("radio-record-status").textContent === "Recording saved."'), 'completed WAV save');
     const recorded = fs.readFileSync(output);
     assert.equal(recorded.readUInt32LE(40), recorded.length - 44); assert.equal(recorded.readUInt32LE(24), 48000);
     assert.ok(recorded.subarray(44).some((v) => v !== 0), 'saved WAV has audible PCM samples');
