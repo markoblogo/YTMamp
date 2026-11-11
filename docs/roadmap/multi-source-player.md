@@ -11,21 +11,24 @@ Owner working agreement, 11 November 2026: work in bounded passes. State each pa
 Current checkpoints:
 
 - Stage 2 verification: accepted by the owner on 11 November after reporting that the player works. Mac UI checks confirmed 75%, 100%, 125% and 150% sizes through keyboard/menu controls and collapse while local playback continued. Automated tests cover restart, multiple roots and offline/reconnect; physical drive disconnection was not performed during that UI pass.
-- A separate 0.6.1 pass adds an explicit **_** button for hiding the window while continuing playback. **X** remains Quit. Return is through the menu-bar/tray icon or Dock; the music library stays intact.
-- Radio is the next feature, pending the next pass discussion. No station catalogue or radio playback has been implemented yet.
+- The 0.6.1 hide button is included in the combined 0.7.0 radio preview. **X** remains Quit. Return is through the menu-bar/tray icon or Dock; the music library stays intact.
+- Radio, station cards/search, a supplied-frequency local FM dial and independent WAV recording are implemented in PR #16. Code at `777ecbc9fdc3bb07c34deecb140bdf2e2b778a8a` passed all three CI platforms, package/signature checks and generated-audio desktop tests. Native installation and real-station listening are still pending; the accepted installed app remains 0.6.0.
+- Owner sequencing update, 11 November: finish and test radio first; then conduct a separate project audit/sanitation/documentation pass, including README and GitHub About; then publish a verified release. Only after that exchange development ideas and agree a prioritized queue. Vinyl, embedded YouTube and other new ideas belong to later bounded passes.
 
 | Stage | Deliverable | Completion check |
 | --- | --- | --- |
 | 1 | Single selected folder and subfolders; local playback, queue, transport controls, local default, existing YT bridge switch | Play and seek real audio; next/previous, shuffle/repeat, errors, restore selected folder, source isolation; macOS listening check |
 | 2 | Several explicitly added folders; persistent library, tags, album art and search within those folders | Restart without duplicate entries; disconnected external drive; no music copied; bounded metadata cache |
 | 3 | Radio by genre, favorites, custom stream URLs and reconnect handling | Working streams, dead-stream feedback, cached directory and reliable source switching |
-| 4 | YT Music playlist selection and optional playback inside the app | Owner login and playlist tested on Mac; existing browser companion remains a supported fallback |
-| 5 | Local vinyl view based on rauchg/vinyl | Visual deck follows the same local queue and controls; no hidden animation workload; CPU/RAM measured on owner's Mac |
-| 6 | macOS release polish and installer | Finder open-with, media keys, sleep/wake, external-drive recovery, Apple Silicon package and installation smoke |
+| 4 | Project audit and sanitation, fixes, dependency/resource review, refreshed project documents/README and GitHub About | Review findings and fixes; remove obsolete generated/experimental material without touching user music/settings; align descriptions with implemented behavior and known limitations; rerun relevant checks; stop and report |
+| 5 | Verified public release of the local-library/radio player | Finish release checks and Mac acceptance, reconcile stacked PRs, align versions, publish release notes/assets and verify downloads; stop and report |
+| 6 | Owner/assistant idea exchange and prioritized development queue | Compare value, effort, runtime cost and dependencies; agree the next bounded block before implementing a new feature |
 
-Stage 5 initially adapts the visual deck to normal local audio. The original vinyl project also performs physical groove/stylus simulation and pre-processes imported audio. Full sound simulation is a separately measured enhancement after the visual version; it must not delay normal playback or create an unbounded cache.
+Deferred ideas for that queue include YT Music playlist selection/optional in-app playback, a local vinyl view based on rauchg/vinyl, further macOS integration and the owner's additional ideas. Their order is not fixed before the post-release discussion.
 
-Owner UI requirement, 11 November 2026: keep the transport as the compact mini-player. The library/search and future vinyl deck are collapsible panels beneath it. Collapsing a panel preserves playback and its browsing state. A collapsed vinyl panel must suspend its animation/rendering workload; it must not stop the shared audio engine. Stage 2 provides both the LIBRARY toggle and an explicit COLLAPSE button; the vinyl panel itself belongs to stage 5.
+The future vinyl pass initially adapts the visual deck to normal local audio. The original vinyl project also performs physical groove/stylus simulation and pre-processes imported audio. Full sound simulation is a separately measured enhancement after the visual version; it must not delay normal playback or create an unbounded cache.
+
+Owner UI requirement, 11 November 2026: keep the transport as the compact mini-player. The library/search and future vinyl deck are collapsible panels beneath it. Collapsing a panel preserves playback and its browsing state. A collapsed vinyl panel must suspend its animation/rendering workload; it must not stop the shared audio engine. Stage 2 provides both the LIBRARY toggle and an explicit COLLAPSE button; the vinyl panel belongs to a later post-release feature pass.
 
 ## Radio requirements for the next stage
 
@@ -40,7 +43,7 @@ The owner combined radio and the pending hide button into one 0.7.0 installation
 - Short, volume-scaled tuning static is optional and kept outside the recording signal path. Recording is bounded at 512 MiB with a 256 MiB free-space reserve; no full-session RAM buffer or audio copies from the local collection.
 - Direct streams use a controlled media protocol. Public HTTP(S) destinations only; DNS answers are checked and pinned per redirect. No renderer network access or general filesystem bridge is added. Initial decoder support follows Electron; HLS is explicitly unsupported rather than silently treated as MP3.
 
-Implementation and generated-audio tests are in the radio branch. CI packaging and native Mac acceptance must be recorded separately before this pass is considered complete.
+Implementation and generated-audio tests are in the radio branch. CI packaging passed; native Mac acceptance is pending and remains a separate completion gate.
 
 - A collapsible station panel using a grid of logos, visually analogous to album cards, with a fallback when a station has no usable logo.
 - Search/filter by station name, music genre, broadcast language and country/region, with combinable filters and clear/reset controls.
