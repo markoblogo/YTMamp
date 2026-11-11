@@ -49,6 +49,43 @@ jobs:
         working-directory: app
         run: npm run pack
 
+      - name: Build Apple Silicon preview
+        if: matrix.os == 'macos-latest'
+        working-directory: app
+        env:
+          # Ad-hoc signing uses no certificate or signing secrets. The explicit
+          # mac.identity='-' must also be honored for pull-request previews.
+          CSC_FOR_PULL_REQUEST: 'true'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:mac -- --arm64
+
+      - name: Verify Apple Silicon signatures and ZIP
+        if: matrix.os == 'macos-latest'
+        run: |
+          codesign --verify --deep --strict --verbose=2 app/dist/mac-arm64/YTMamp.app
+          ditto -x -k app/dist/YTMamp-0.5.0-mac.zip "$RUNNER_TEMP/ytmamp-preview-verify"
+          codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/ytmamp-preview-verify/YTMamp.app"
+
+      - name: Bundle matching browser companion
+        if: matrix.os == 'macos-latest'
+        run: zip -r app/dist/YTMamp-0.5.0-extension.zip extension
+
+      - name: Upload Apple Silicon preview
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: YTMamp-stage1-macos-arm64
+          path: |
+            app/dist/YTMamp-0.5.0-mac.dmg
+            app/dist/YTMamp-0.5.0-mac.zip
+            app/dist/YTMamp-0.5.0-extension.zip
+          if-no-files-found: error
+
+      - name: Local playback desktop smoke
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: app
+        run: xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/smoke-local-playback.js
+
       - name: Upload smoke summary artifact
         if: always()
         uses: actions/upload-artifact@v7
@@ -57,6 +94,7 @@ jobs:
           path: |
             app/ci-smoke-summary.md
             app/ci-smoke-output.log
+            app/local-playback-smoke.png
 
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js

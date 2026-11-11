@@ -17,6 +17,7 @@ const KNOWN_MESSAGE_TYPES = new Set([
 ]);
 const KNOWN_COMMANDS = new Set([
     'playPause',
+    'pause',
     'next',
     'prev',
     'seek',

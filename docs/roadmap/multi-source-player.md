@@ -1,0 +1,53 @@
+# YTMamp multi-source player
+
+Owner scope, 11 November 2026: a retro macOS player that starts in local mode, with optional YouTube Music, internet radio and a local vinyl view. Music is already organized in folders. **Whole-computer audio discovery is excluded.** Audio stays in its original folders, including external drives.
+
+## Delivery sequence
+
+Each stage is implemented and verified independently before starting the next one.
+
+| Stage | Deliverable | Completion check |
+| --- | --- | --- |
+| 1 | Single selected folder and subfolders; local playback, queue, transport controls, local default, existing YT bridge switch | Play and seek real audio; next/previous, shuffle/repeat, errors, restore selected folder, source isolation; macOS listening check |
+| 2 | Several explicitly added folders; persistent library, tags, album art and search within those folders | Restart without duplicate entries; disconnected external drive; no music copied; bounded metadata cache |
+| 3 | Radio by genre, favorites, custom stream URLs and reconnect handling | Working streams, dead-stream feedback, cached directory and reliable source switching |
+| 4 | YT Music playlist selection and optional playback inside the app | Owner login and playlist tested on Mac; existing browser companion remains a supported fallback |
+| 5 | Local vinyl view based on rauchg/vinyl | Visual deck follows the same local queue and controls; no hidden animation workload; CPU/RAM measured on owner's Mac |
+| 6 | macOS release polish and installer | Finder open-with, media keys, sleep/wake, external-drive recovery, Apple Silicon package and installation smoke |
+
+Stage 5 initially adapts the visual deck to normal local audio. The original vinyl project also performs physical groove/stylus simulation and pre-processes imported audio. Full sound simulation is a separately measured enhancement after the visual version; it must not delay normal playback or create an unbounded cache.
+
+## Candidate donors reviewed
+
+These are candidates, not bundled dependencies. No donor code has been copied in stage 1.
+
+| Project | License reported by repository | Useful parts | Integration decision |
+| --- | --- | --- | --- |
+| [Webamp](https://github.com/captbaritone/webamp) | MIT | Browser audio, playlists, retro UI interactions and optional Butterchurn integration | Closest web technology reference; borrow narrow modules if they beat the existing small renderer |
+| [Museeks](https://github.com/martpie/museeks) | MIT | Local library, playlists, queue and metadata workflows | Current version uses Tauri/Rust and React; reference design and data flow, not a drop-in Electron backend |
+| [Radio Browser](https://docs.radio-browser.info/) | Public directory/API; service is not a bundled code donor | Genre tags, station search, resolved stream URLs and health fields | Preferred directory source, with favorites and cached results independent of service uptime |
+| [Radiola](https://github.com/SokoloffA/radiola) | MIT | macOS radio UX, station management and history | Native Swift code needs adaptation; useful reference for radio stage |
+| [Pear Desktop](https://github.com/pear-devs/pear-desktop) | MIT | Electron YouTube Music integration and plugin architecture | Inspect account/session/player integration in stage 4; do not import its whole application |
+| [vinyl](https://github.com/rauchg/vinyl) | MIT for code | WebGL2 deck, record/arm mechanics, optional Web Audio simulation | Adapt renderer for stage 5; preserve attribution and handle bundled recordings under their own licenses |
+| [Musicat](https://github.com/basharovV/musicat) | GPL-3.0 | Rich local library, tagging and playlists | Product reference; avoid copying GPL code into the current MIT codebase without an explicit licensing decision |
+
+Before copying any module, verify the actual license file and file-level notices at the selected commit. Prefer existing platform APIs over adding an entire donor's runtime, UI framework or database.
+
+## Stage 1 behavior
+
+- The app always starts in LOCAL mode, paused. FOLDER opens a native directory picker; LIST expands the local queue. Selecting a track starts it. Closing the folder picker does not change the queue.
+- Supported filename extensions: MP3, WAV, FLAC, M4A, AAC, OGG and OPUS. Actual codec support is determined by Electron; unreadable or unsupported files show an error and do not trigger an endless skip loop.
+- Tracks are displayed by filename and relative directory. Embedded tags, covers, multiple roots and library search belong to stage 2.
+- The last folder, selected track and local volume are saved. Restart re-reads only that folder and restores it paused. A missing drive can be reconnected and selected again.
+- Import skips hidden entries and symlinks and stops at 5,000 tracks or 50,000 examined entries. The UI reports limits, skipped directories and cancelation. These are per-folder limits, not a machine-wide discovery feature.
+- Audio is streamed from its original file through a custom protocol with queue IDs, path containment checks and byte-range support. The renderer receives neither arbitrary filesystem access nor absolute paths.
+- LOCAL and YT share the existing metadata/state API. Inactive YouTube reports cannot replace the local track. Switching pauses outgoing playback; switching back never starts music automatically.
+- YT still uses the signed-in browser tab and companion extension in this stage. Update the companion from this branch for the new idempotent `pause` command used on source changes. The app does not download YouTube audio or make its playlists available offline.
+
+## Validation
+
+`npm run check`, `npm audit --audit-level=high` and `npm run pack` remain the release checks. `npm run test:desktop` adds a real Electron playback smoke using generated WAV files, muted output, isolated settings and a stubbed native folder picker. It verifies decoding, waveform data, seeking, queue controls, source switching and error handling without reading the owner's music. Linux CI runs it under Xvfb.
+
+The desktop automation does not replace the owner's macOS listening check. Before stage 1 is called release-ready, verify an actual music folder on the Mac, including YT source switching with the updated companion. Do not tag or merge solely because packaging succeeded.
+
+CI produces an unsigned Apple Silicon preview and matching v0.5.0 companion as `YTMamp-stage1-macos-arm64`. These are preview artifacts, not a tagged public release. The first Linux CI pass confirmed actual audio decoding, analyzer output and seeking; the final dependency lock and macOS package are checked again on the final branch revision.

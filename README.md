@@ -4,7 +4,9 @@
 [![Release](https://img.shields.io/github/v/release/markoblogo/YTMamp?display_name=tag&sort=semver)](https://github.com/markoblogo/YTMamp/releases/latest)
 [![License](https://img.shields.io/github/license/markoblogo/YTMamp)](LICENSE)
 
-A compact retro remote for YouTube Music. The desktop app stays above your work while a Chromium companion controls the active YouTube Music tab.
+A compact retro desktop music player. It starts as a local folder player; switch to YouTube Music to control your signed-in browser tab through the Chromium companion.
+
+Local playback is being introduced in a staged development branch. The published v0.4.1 downloads remain the YouTube Music remote described in their release notes.
 
 [![YTMamp demo video](https://img.youtube.com/vi/fHRDm8e2n-U/maxresdefault.jpg)](https://youtu.be/fHRDm8e2n-U)
 
@@ -13,6 +15,8 @@ A compact retro remote for YouTube Music. The desktop app stays above your work 
 
 ## What it does
 
+- Play local music from a selected folder and its subfolders without copying audio. Use **FOLDER**, **LIST** and the **LOCAL / YT MUSIC** selector; local playback works without a browser or internet connection.
+- Restore the last local folder and selected track paused. MP3, WAV, FLAC, M4A, AAC, OGG and OPUS files are recognized; decoder support depends on Electron. Current labels come from filenames; embedded tags and covers follow in the next stage.
 - Play, pause, skip, seek, change volume, like, shuffle, and repeat.
 - Show track metadata and a live oscilloscope in a 360 × 116 always-on-top window.
 - Integrate with system tray controls, media keys, startup settings, Last.fm, OBS, and a versioned local API.
@@ -71,6 +75,8 @@ npm run pack
 `npm start` launches the desktop app. Platform installers are built with `npm run dist:mac`, `npm run dist:win`, or `npm run dist:linux`.
 
 CI checks lint, tests, dependency audit, and an unpacked app package on macOS, Windows, and Ubuntu. Interactive desktop/browser checks remain separate in the [release smoke plan](docs/smoke-test.md).
+
+`npm run test:desktop` runs an isolated, muted Electron playback smoke with generated audio. The [multi-source implementation plan](docs/roadmap/multi-source-player.md) defines stage boundaries and candidate donor projects. Whole-computer music discovery is excluded; only explicitly selected music folders are used.
 
 ## Integrations
 

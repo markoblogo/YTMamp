@@ -52,9 +52,55 @@ body {
 #status-group {
     margin-left: auto;
     display: flex;
-    gap: 8px;
+    gap: 5px;
     align-items: center;
 }
+
+#source-select, #open-folder, #queue-toggle {
+    -webkit-app-region: no-drag;
+    font: inherit;
+    letter-spacing: 0;
+    color: #b9f6b9;
+    background: #171a17;
+    border: 1px solid #555;
+    margin-left: 5px;
+    padding: 0 3px;
+    height: 16px;
+}
+
+#source-select { width: 74px; }
+#open-folder, #queue-toggle { cursor: pointer; }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 1px solid #fff; outline-offset: -1px; }
+[hidden] { display: none !important; }
+
+#local-queue {
+    height: 224px;
+    padding: 7px;
+    border: 1px solid #444;
+    background: #101210;
+    overflow-y: auto;
+    -webkit-app-region: no-drag;
+}
+#folder-row { display: flex; gap: 5px; align-items: start; }
+#folder-notice { flex: 1; color: #b2b7b2; margin: 0 0 6px; font-size: 10px; }
+#queue-tracks { margin: 0; padding-left: 28px; }
+#queue-tracks li { margin: 2px 0; }
+#queue-tracks button {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    padding: 3px 5px;
+    color: #b4c0b4;
+    background: #171c17;
+    border: 1px solid transparent;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+#queue-tracks button[aria-current="true"] { border-color: #487848; color: #0f0; }
+#queue-more, #cancel-scan { font: inherit; color: #b9f6b9; background: #222; border: 1px solid #555; }
+#queue-more { margin-top: 5px; width: 100%; }
 
 #vol-status {
     font-size: 8px;

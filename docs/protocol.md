@@ -20,6 +20,8 @@ A missing token produces `auth-request` followed by WebSocket close code `4003`.
 
 Renderer-to-extension commands are `playPause`, `next`, `prev`, `seek` (`valueSec`), `setVolume` (`value` from `0` to `1`), `like`, `dislike`, `shuffle`, and `repeat`.
 
+The local-player development branch also accepts `pause`, an idempotent media pause used when switching away from YouTube Music. Update the companion extension together with the desktop branch. LOCAL commands are handled inside the app and are not relayed to the extension. Protocol message version stays `1`; published v0.4.1 companions do not implement this new command.
+
 Popup-to-app commands are `showWindow` and `hideWindow`.
 
 ## Status and validation
