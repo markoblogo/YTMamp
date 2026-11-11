@@ -24,7 +24,8 @@ const wav = taggedWav({ seconds: 60, frequency: 440 });
 // Stub only the exported transport in this test process. Production has no LAN bypass.
 network.createRadioMediaHandler = (resolve) => async (request) => {
     const station = resolve(new URL(request.url).pathname.slice(1));
-    return station?.name === broken.name ? new Response('not audio', { headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } }) : new Response(wav, { headers: { 'content-type': 'audio/wav', 'access-control-allow-origin': '*' } });
+    const body = new URL(request.url).hostname === 'radio-check' ? wav.subarray(0, 128 * 1024) : wav;
+    return station?.name === broken.name ? new Response('not audio', { headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } }) : new Response(body, { headers: { 'content-type': 'audio/wav', 'access-control-allow-origin': '*' } });
 };
 dialog.showSaveDialog = async () => ({ canceled: false, filePath: output });
 let report; let record; let finished = false;
