@@ -1,4 +1,4 @@
-const { app, dialog, ipcMain } = require('electron');
+const { app, dialog, ipcMain, Menu } = require('electron');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -61,7 +61,13 @@ async function run(window) {
     await evaluate('document.getElementById("library-collapse").click()');
     await waitFor(() => window.getContentBounds().height === 116, 'collapse to mini-player');
     assert.equal(await evaluate('document.getElementById("local-queue").hidden'), true);
+    Menu.getApplicationMenu().getMenuItemById('player-size-75').click();
+    await waitFor(() => window.getContentBounds().height === 87 && window.getContentBounds().width === 270, '75 percent mini-player');
+    assert.equal(window.webContents.getZoomFactor(), 0.75);
+    await waitFor(() => evaluate('document.documentElement.scrollWidth <= 360'), 'scaled controls fit');
     await evaluate('document.getElementById("queue-toggle").click()');
+    await waitFor(() => window.getContentBounds().height === 420, 'reopen scaled library');
+    Menu.getApplicationMenu().getMenuItemById('player-size-100').click();
     await waitFor(() => window.getContentBounds().height === 560, 'reopen library');
     assert.equal(await evaluate('document.getElementById("library-search").value'), 'bjork cafe');
     assert.equal(await evaluate('document.querySelectorAll("#queue-tracks button").length'), 2);
@@ -92,6 +98,7 @@ async function run(window) {
     assert.ok(fs.existsSync(path.join(second, 'other.wav')));
     const saved = JSON.parse(fs.readFileSync(path.join(profile, 'local-library-v1.json'), 'utf8'));
     assert.equal(saved.roots.length, 1); assert.equal(Object.keys(saved.entries).length, 2);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).playerScale, 100);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 700'), true);
     const screenshot = await window.webContents.capturePage();
     fs.writeFileSync(path.join(__dirname, '../library-smoke.png'), screenshot.toPNG());

@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Read-only embedded metadata through the MIT-licensed `music-metadata` parser in a bounded worker, with filename/folder fallbacks.
 - Embedded and folder cover art, album browsing, disc/track ordering and album-scoped playback queues.
 - Accent-insensitive collection search and a folder filter in an expandable library window.
+- Explicit library collapse/reopen controls that preserve browsing and playback, plus saved 75%/100%/125%/150% player sizes through context, tray and View menus.
 - Refresh, cancel, safe folder removal and cached offline albums that return after reconnecting and refreshing.
 - Generated tagged-audio tests, an Electron library smoke and a signed Mac package worker-loading check.
 

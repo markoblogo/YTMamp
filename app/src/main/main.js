@@ -42,6 +42,7 @@ let activeSource = 'local';
 let ytmStatus = 'Need YTM Tab';
 const ytmSnapshot = { track: null, state: null };
 let folderScan;
+let libraryVisible = false;
 let collection;
 let collectionReady;
 let choosingFolder = false;
@@ -714,7 +715,8 @@ let settings = {
     bridgeAuthToken: '',
     localFolder: '',
     localTrackId: '',
-    localVolume: 0.5
+    localVolume: 0.5,
+    playerScale: 100
 };
 
 function loadSettings() {
@@ -725,6 +727,7 @@ function loadSettings() {
             settings.startAtLogin = typeof settings.startAtLogin === 'boolean' ? settings.startAtLogin : !!settings.startAtLogin;
             settings.autoShowOnPlay = typeof settings.autoShowOnPlay === 'boolean' ? settings.autoShowOnPlay : true;
             settings.bridgeAuthToken = (typeof settings.bridgeAuthToken === 'string' && settings.bridgeAuthToken.length <= 512) ? settings.bridgeAuthToken : '';
+            settings.playerScale = [75, 100, 125, 150].includes(settings.playerScale) ? settings.playerScale : 100;
             if (settings.windowBounds && (typeof settings.windowBounds.x !== 'number' || typeof settings.windowBounds.y !== 'number')) {
                 settings.windowBounds = null;
             }
@@ -923,13 +926,62 @@ function getExpectedAuthToken() {
     return generated;
 }
 
+function playerSizeItems() {
+    return [75, 100, 125, 150].map((percent) => ({
+        id: 'player-size-' + percent, label: percent + '%', type: 'radio', checked: settings.playerScale === percent,
+        click: () => setPlayerSize(percent)
+    }));
+}
+
+function applyPlayerLayout() {
+    if (!mainWindow) return;
+    const scale = settings.playerScale / 100;
+    const area = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
+    mainWindow.webContents.setZoomFactor(scale);
+    mainWindow.setContentSize(
+        Math.min(area.width, Math.round((libraryVisible ? 700 : 360) * scale)),
+        Math.min(area.height, Math.round((libraryVisible ? 560 : 116) * scale))
+    );
+    const bounds = mainWindow.getBounds();
+    mainWindow.setPosition(
+        Math.max(area.x, Math.min(bounds.x, area.x + area.width - bounds.width)),
+        Math.max(area.y, Math.min(bounds.y, area.y + area.height - bounds.height))
+    );
+}
+
+function setPlayerSize(percent) {
+    if (![75, 100, 125, 150].includes(percent)) return;
+    settings.playerScale = percent;
+    saveSettings(); applyPlayerLayout(); updateTrayMenu(); updateApplicationMenu();
+}
+
+function updateApplicationMenu() {
+    const step = (direction) => {
+        const sizes = [75, 100, 125, 150];
+        setPlayerSize(sizes[Math.max(0, Math.min(sizes.length - 1, sizes.indexOf(settings.playerScale) + direction))]);
+    };
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+        ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+        { role: 'fileMenu' }, { role: 'editMenu' },
+        { label: 'View', submenu: [
+            { label: 'Player size', submenu: playerSizeItems() },
+            { label: 'Smaller', accelerator: 'CommandOrControl+-', click: () => step(-1) },
+            { label: 'Larger', accelerator: 'CommandOrControl+=', click: () => step(1) },
+            { label: 'Actual size', accelerator: 'CommandOrControl+0', click: () => setPlayerSize(100) },
+            { type: 'separator' }, { role: 'toggleDevTools' }
+        ] },
+        { role: 'windowMenu' }
+    ]));
+}
+
 function createWindow() {
+    libraryVisible = false;
     const savedBounds = boundsAreVisible(settings.windowBounds) ? settings.windowBounds : {};
     mainWindow = new BrowserWindow({
         x: savedBounds.x,
         y: savedBounds.y,
-        width: 360,
-        height: 116,
+        width: Math.round(360 * settings.playerScale / 100),
+        height: Math.round(116 * settings.playerScale / 100),
         useContentSize: true,
         frame: false,
         resizable: false,
@@ -939,6 +991,7 @@ function createWindow() {
         backgroundColor: '#000000',
         show: false,
         webPreferences: {
+            zoomFactor: settings.playerScale / 100,
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
@@ -946,8 +999,12 @@ function createWindow() {
         },
     });
 
+    applyPlayerLayout();
     mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+    mainWindow.webContents.on('context-menu', () => {
+        Menu.buildFromTemplate([{ label: 'Player size', submenu: playerSizeItems() }]).popup({ window: mainWindow });
+    });
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
     mainWindow.webContents.on('did-finish-load', () => {
@@ -1002,6 +1059,7 @@ function updateTrayMenu() {
         { label: 'YTMamp', enabled: false },
         { type: 'separator' },
         { label: 'Show/Hide', click: () => toggleWindow() },
+        { label: 'Player size', submenu: playerSizeItems() },
         { label: 'Add music folders...', click: () => chooseMusicFolder() },
         { label: 'Refresh music library', click: () => changeCollection() },
         { label: 'Playback source', submenu: [
@@ -1300,13 +1358,8 @@ function setupIpc() {
     });
     ipcMain.on('set-queue-visible', (event, visible) => {
         if (!isPlayerSender(event) || typeof visible !== 'boolean') return;
-        mainWindow.setContentSize(visible ? 700 : 360, visible ? 560 : 116);
-        const bounds = mainWindow.getBounds();
-        const area = screen.getDisplayMatching(bounds).workArea;
-        mainWindow.setPosition(
-            Math.max(area.x, Math.min(bounds.x, area.x + area.width - bounds.width)),
-            Math.max(area.y, Math.min(bounds.y, area.y + area.height - bounds.height))
-        );
+        libraryVisible = visible;
+        applyPlayerLayout();
     });
 
     ipcMain.on('quit-app', () => {
@@ -1327,6 +1380,7 @@ app.whenReady().then(() => {
     setupLocalPlayback();
     createWindow();
     createTray();
+    updateApplicationMenu();
     setupIpc();
     configurePlayerCastBridge({
         getPlayerSnapshot: () => ({

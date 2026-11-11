@@ -44,6 +44,7 @@ Automated coverage is separate from the following owner checks:
 6. Remove one root from the library. Verify its original files are intact and overlapping tracks still belong to any remaining root. Test canceling a large import.
 7. Confirm the mini-player remains compact and the expanded library stays within the display. Check audible output on representative MP3, FLAC, M4A and WAV files.
 8. Collapse the library with COLLAPSE and reopen with LIBRARY. Confirm the query, album/folder selection and playback are preserved. The future vinyl deck must follow the same panel behavior and suspend rendering when collapsed.
+9. Set Player size to 75% by right click or View menu. Confirm the full transport fits in 270 × 87, reopen the library, then test 125%/150% and reset with Cmd/Ctrl+0. Reopen the app and confirm the chosen size persists. Scaling must preserve the selected track, playback and filters and keep the window in the display's work area.
 
 `npm run test:library:desktop` covers generated tagged WAV decoding, image decoding, multiple roots, accent-insensitive search, album playback boundaries, offline/reconnect and safe removal under Linux Xvfb. Unit tests cover restart, cancellation, containment, cache budgets and public catalog fields. A Mac CI check loads the real metadata worker and parser from the signed app's ASAR. These checks use generated music and temporary profiles, not the owner's collection.
 
