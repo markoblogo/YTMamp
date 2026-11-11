@@ -60,6 +60,7 @@ async function run(window) {
     await evaluate('document.getElementById("library-clear").click(); document.getElementById("view-albums").click();');
     await waitFor(() => evaluate('document.querySelectorAll(".album-card").length === 2'), 'album grid');
     await waitFor(() => evaluate('[...document.querySelectorAll("#album-grid img")].every(image => image.complete && image.naturalWidth > 0)'), 'artwork decoding and CSP');
+    await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))');
     const albumScreenshot = (await window.webContents.capturePage()).toPNG();
     fs.writeFileSync(path.join(__dirname, '../library-albums-smoke.png'), albumScreenshot);
     console.log('LIBRARY_ALBUMS_PREVIEW:' + albumScreenshot.toString('base64'));

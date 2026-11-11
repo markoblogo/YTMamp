@@ -138,6 +138,26 @@ test('search matches accent-insensitive artist/title/album/genre and supports fo
     assert.equal(view.albums(tracks).find((album) => album.id === 'album1').available, 0);
 });
 
+test('first migration restores the saved track after indexing an initially empty cache', async (t) => {
+    const f = await setup(t);
+    await f.collection.load(f.first);
+    const selectedId = createHash('sha256').update(path.join(f.album, 'a-second.wav')).digest('hex');
+    const player = new LocalPlayer();
+    player.setLibrary(f.collection.snapshot(), selectedId);
+    assert.equal(player.current, null);
+    player.setLibrary(await f.collection.update(), selectedId, { preservePlayback: true });
+    assert.equal(player.current.id, selectedId);
+    assert.equal(player.current.title, 'Second movement');
+    assert.equal(player.state.playing, false);
+});
+
+test('a folder album with mixed artists is labeled as a compilation', () => {
+    const result = view.albums([{ id: 'a', albumId: 'folder', album: 'Music', artist: 'One' }, { id: 'b', albumId: 'folder', album: 'Music', artist: 'Two' }]);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].artist, 'Various artists');
+    assert.equal(result[0].count, 2);
+});
+
 test('corrupt manifests recover without trusting cached paths outside added roots', async (t) => {
     const f = await setup(t);
     await fs.mkdir(f.profile, { recursive: true }); await fs.writeFile(f.collection.manifest, '{bad json');

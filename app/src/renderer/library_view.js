@@ -14,8 +14,10 @@
         const groups = new Map();
         for (const track of tracks) {
             const id = track.albumId || track.id;
-            if (!groups.has(id)) groups.set(id, { id, title: track.album || 'Unknown album', artist: track.albumArtist || track.artist || 'Unknown artist', year: track.year || 0, cover: '', count: 0, available: 0 });
+            const artist = track.albumArtist || track.artist || 'Unknown artist';
+            if (!groups.has(id)) groups.set(id, { id, title: track.album || 'Unknown album', artist, year: track.year || 0, cover: '', count: 0, available: 0 });
             const album = groups.get(id);
+            if (album.artist !== artist) album.artist = 'Various artists';
             album.count++;
             if (track.available !== false) album.available++;
             if (!album.cover && track.cover) album.cover = track.cover;

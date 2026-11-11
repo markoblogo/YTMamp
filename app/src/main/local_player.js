@@ -42,7 +42,8 @@ class LocalPlayer extends EventEmitter {
             this.publish(); // Keep the media element and revision while indexing.
             return;
         }
-        const restored = library.tracks.findIndex((item) => item.id === (preservePlayback ? oldId : selectedId));
+        const restoredId = preservePlayback && oldId ? oldId : selectedId;
+        const restored = library.tracks.findIndex((item) => item.id === restoredId);
         const firstAvailable = library.tracks.findIndex((item) => item.available !== false);
         this.select(restored >= 0 ? restored : Math.max(0, firstAvailable), false);
     }
