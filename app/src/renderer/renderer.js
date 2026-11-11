@@ -6,6 +6,8 @@ let commandCounter = 0;
 let isDraggingVolume = false;
 let volumeCooldownTimer = null;
 let uiVolume = 0.5;
+let playbackSource = 'local';
+window.electronAPI.onSourceChange((value) => { playbackSource = value; });
 const DEBUG_OVERLAY = false;
 const DEBUG_UI = false;
 
@@ -28,9 +30,9 @@ window.electronAPI.onStatusChange((status) => {
     const statusUpper = status.toUpperCase();
 
     led.className = ''; // reset
-    if (statusUpper === 'LOCAL') {
+    if (statusUpper === 'LOCAL' || statusUpper === 'RADIO') {
         led.classList.add('connected');
-        led.title = 'Local music (works offline)';
+        led.title = statusUpper === 'RADIO' ? 'Online radio' : 'Local music (works offline)';
     } else if (statusUpper.includes('CONNECTED')) {
         led.classList.add('connected');
         led.title = 'Connected';
@@ -38,8 +40,8 @@ window.electronAPI.onStatusChange((status) => {
         led.classList.add('waiting');
         led.title = statusUpper.includes('NEED') ? 'No YouTube Music tab' : 'Reconnecting / Need Tab';
         if (statusUpper.includes('NEED')) {
-            document.getElementById('title').innerText = 'YTMamp';
-            document.getElementById('artist').innerText = 'No YouTube Music tab';
+            document.getElementById('title').innerText = 'YouTube Music';
+            document.getElementById('artist').innerText = 'Connect companion in browser / OPEN';
             document.getElementById('timer').innerText = '--:-- / --:--';
             document.getElementById('progress-bar').value = 0;
             document.getElementById('progress-fill').style.width = '0%';
@@ -130,7 +132,7 @@ window.electronAPI.onWaveUpdate((msg) => {
 });
 
 function draw() {
-    const localWave = window.readLocalWave?.();
+    const localWave = window.readLocalWave?.() || window.readRadioWave?.();
     if (localWave) {
         lastWaveData = localWave;
         lastWaveTime = Date.now();
@@ -193,8 +195,8 @@ window.electronAPI.onVolStatus((status) => {
 
 window.electronAPI.onTrackUpdate((track) => {
     if (!track) {
-        document.getElementById('title').innerText = 'YTMamp';
-        document.getElementById('artist').innerText = 'Choose a source or music folder';
+        document.getElementById('title').innerText = playbackSource === 'radio' ? 'Radio' : playbackSource === 'ytm' ? 'YouTube Music' : 'YTMamp';
+        document.getElementById('artist').innerText = playbackSource === 'radio' ? 'Open LIBRARY to choose a station' : playbackSource === 'ytm' ? 'Connect companion in your browser' : 'Choose a music folder';
         return;
     }
     document.getElementById('title').innerText = track.title;
@@ -253,14 +255,19 @@ document.getElementById('close-btn').onclick = () => {
 };
 
 document.getElementById('prev-btn').onclick = () => {
+    if (window.ensureLocalRadioQueue && !window.ensureLocalRadioQueue()) return;
     console.log('[DEBUG] CLICK prev');
     sendCommand('cmd', 'prev');
 };
 document.getElementById('play-pause-btn').onclick = () => {
+    if (window.ensureRadioStation && !window.ensureRadioStation()) return;
     console.log('[DEBUG] CLICK play-pause');
     sendCommand('cmd', 'playPause');
 };
+document.getElementById('open-ytm').onclick = () => window.electronAPI.openYtm();
+window.electronAPI.onSourceNotice((message) => { document.getElementById('artist').textContent = message; });
 document.getElementById('next-btn').onclick = () => {
+    if (window.ensureLocalRadioQueue && !window.ensureLocalRadioQueue()) return;
     console.log('[DEBUG] CLICK next');
     sendCommand('cmd', 'next');
 };

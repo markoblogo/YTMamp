@@ -57,13 +57,15 @@ jobs:
           # mac.identity='-' must also be honored for pull-request previews.
           CSC_FOR_PULL_REQUEST: 'true'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          YTMAMP_LOCATION_ARCH: 'arm64'
         run: npm run dist:mac -- --arm64
 
       - name: Verify Apple Silicon signatures and ZIP
         if: matrix.os == 'macos-latest'
         run: |
           codesign --verify --deep --strict --verbose=2 app/dist/mac-arm64/YTMamp.app
-          ditto -x -k app/dist/YTMamp-0.6.1-mac.zip "$RUNNER_TEMP/ytmamp-preview-verify"
+          app/dist/mac-arm64/YTMamp.app/Contents/Resources/native/ytmamp-location --check
+          ditto -x -k app/dist/YTMamp-0.7.2-mac.zip "$RUNNER_TEMP/ytmamp-preview-verify"
           codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/ytmamp-preview-verify/YTMamp.app"
 
       - name: Test metadata in signed Apple Silicon package
@@ -75,17 +77,17 @@ jobs:
 
       - name: Bundle matching browser companion
         if: matrix.os == 'macos-latest'
-        run: zip -r app/dist/YTMamp-0.6.1-extension.zip extension
+        run: zip -r app/dist/YTMamp-0.7.2-extension.zip extension
 
       - name: Upload Apple Silicon preview
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v7
         with:
-          name: YTMamp-0.6.1-macos-arm64
+          name: YTMamp-0.7.2-macos-arm64
           path: |
-            app/dist/YTMamp-0.6.1-mac.dmg
-            app/dist/YTMamp-0.6.1-mac.zip
-            app/dist/YTMamp-0.6.1-extension.zip
+            app/dist/YTMamp-0.7.2-mac.dmg
+            app/dist/YTMamp-0.7.2-mac.zip
+            app/dist/YTMamp-0.7.2-extension.zip
           if-no-files-found: error
 
       - name: Local playback desktop smoke
@@ -98,6 +100,11 @@ jobs:
         working-directory: app
         run: xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/smoke-library.js
 
+      - name: Radio desktop smoke
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: app
+        run: xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/smoke-radio.js
+
       - name: Upload smoke summary artifact
         if: always()
         uses: actions/upload-artifact@v7
@@ -109,6 +116,7 @@ jobs:
             app/local-playback-smoke.png
             app/library-smoke.png
             app/library-albums-smoke.png
+            app/radio-smoke.png
 
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js

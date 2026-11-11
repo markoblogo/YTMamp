@@ -14,6 +14,7 @@ async function appFixture(t) {
     const requireFromMain = createRequire(filename);
     const messages = [];
     const relayed = [];
+    const opened = [];
     const handlers = new Map();
     let bridgeOptions;
     const bounds = { x: 1000, y: 600, width: 360, height: 116 };
@@ -26,11 +27,12 @@ async function appFixture(t) {
         setPosition: (x, y) => Object.assign(bounds, { x, y }),
         webContents: { send: (name, value) => messages.push({ name, value }), setZoomFactor: (value) => { zoomFactor = value; } } };
     const electron = {
+        shell: { openExternal: async (url) => { opened.push(url); } },
         app: { getPath: () => dir, on() {}, whenReady: () => ({ then() {} }) },
         protocol: { registerSchemesAsPrivileged() {}, handle() {} },
         screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1200, height: 700 } }) },
         Menu: { buildFromTemplate: (items) => items, setApplicationMenu() {} },
-        ipcMain: { on: (name, callback) => handlers.set(name, callback) }
+        ipcMain: { on: (name, callback) => handlers.set(name, callback), handle: (name, callback) => handlers.set(name, callback) }
     };
     const context = vm.createContext({
         console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
@@ -56,7 +58,7 @@ async function appFixture(t) {
         { id: 'b'.repeat(64), title: 'Second', artist: 'Music', relativePath: 'second.wav', filePath: path.join(dir, 'second.wav') }
     ] };
     vm.runInContext('localPlayer.setLibrary(testLibrary);', context);
-    return { context, messages, relayed, handlers, event, bridgeOptions, bounds, zoom: () => zoomFactor, visible: () => visible, directory: dir,
+    return { context, messages, relayed, opened, handlers, event, bridgeOptions, bounds, zoom: () => zoomFactor, visible: () => visible, directory: dir,
         snapshot: () => JSON.parse(vm.runInContext('JSON.stringify({ source: activeSource, track: playerState.track, state: playerState.state })', context)) };
 }
 
@@ -70,6 +72,19 @@ test('desktop starts local, routes controls locally and ignores inactive YouTube
     assert.equal(fixture.snapshot().track.title, 'Second');
     assert.equal(fixture.relayed.length, 0);
     assert.equal(fixture.messages.filter((message) => message.name === 'local-audio-command').at(-1).value.autoplay, true);
+});
+
+test('YouTube source opens the default browser when absent, but never duplicates a connected session', async (t) => {
+    const fixture = await appFixture(t);
+    fixture.handlers.get('set-source')(fixture.event, 'ytm');
+    assert.deepEqual(fixture.opened, ['https://music.youtube.com/']);
+    fixture.handlers.get('set-source')(fixture.event, 'local');
+    fixture.handlers.get('set-source')(fixture.event, 'ytm');
+    assert.equal(fixture.opened.length, 1);
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'track', title: 'YT song', artist: 'YT' });
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'status', msg: 'Client connected' });
+    fixture.handlers.get('open-ytm')(fixture.event);
+    assert.equal(fixture.opened.length, 1);
 });
 
 test('source switching pauses outgoing local audio and sends an idempotent YouTube pause', async (t) => {
@@ -132,4 +147,30 @@ test('hide keeps local audio running; tray restore and YouTube auto-show respect
     assert.equal(fixture.visible(), false, 'a new YouTube track does not undo an explicit hide');
     fixture.bridgeOptions.onMessage({ v: 1, type: 'cmd', cmd: 'showWindow' });
     assert.equal(fixture.visible(), true);
+});
+
+test('radio stays isolated from inactive sources and untrusted frames; hide preserves the stream', async (t) => {
+    const fixture = await appFixture(t);
+    vm.runInContext('radioLibrary.stations.set("c".repeat(64), {id:"c".repeat(64),name:"Radio Test",url:"https://example.org/stream",region:"Local",countrycode:"FR",genre:"jazz"})', fixture.context);
+    const action = fixture.handlers.get('radio-action');
+    const invalid = { ...fixture.event, senderFrame: { url: 'https://example.com' } };
+    assert.ok((await action(invalid, 'record', { action: 'start' })).error);
+    assert.ok((await action(invalid, 'stream-check', { id: 'c'.repeat(64), ok: false })).error);
+    assert.ok((await action(fixture.event, 'stream-check', { id: 'c'.repeat(64), ok: true })).error, 'inactive source cannot report checks');
+    fixture.handlers.get('set-source')(fixture.event, 'radio');
+    assert.ok((await action(fixture.event, 'stream-check', { id: 'c'.repeat(64), ok: 'true' })).error);
+    assert.equal((await action(fixture.event, 'stream-check', { id: 'c'.repeat(64), ok: true })).ok, true);
+    assert.equal((await action(fixture.event, 'play', { id: 'c'.repeat(64) })).ok, true);
+    vm.runInContext('radioPlayer.receive({id:radioPlayer.id,revision:radioPlayer.revision,playing:true})', fixture.context);
+    assert.equal(fixture.snapshot().track.title, 'Radio Test');
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'track', title: 'Inactive YouTube', artist: 'YT' });
+    assert.equal(fixture.snapshot().track.title, 'Radio Test');
+    const before = fixture.messages.filter((m) => m.name === 'radio-audio-command').length;
+    fixture.handlers.get('hide-window')(fixture.event);
+    assert.equal(fixture.snapshot().state.playing, true);
+    assert.equal(fixture.messages.filter((m) => m.name === 'radio-audio-command').length, before);
+    fixture.handlers.get('set-source')(fixture.event, 'local');
+    assert.equal(fixture.messages.filter((m) => m.name === 'radio-audio-command').at(-1).value.action, 'pause');
+    assert.equal(fixture.snapshot().track.title, 'First');
+    assert.equal(fixture.snapshot().state.playing, false);
 });

@@ -4,9 +4,9 @@
 [![Release](https://img.shields.io/github/v/release/markoblogo/YTMamp?display_name=tag&sort=semver)](https://github.com/markoblogo/YTMamp/releases/latest)
 [![License](https://img.shields.io/github/license/markoblogo/YTMamp)](LICENSE)
 
-A compact retro desktop music player. It starts as a local folder player; switch to YouTube Music to control your signed-in browser tab through the Chromium companion.
+A compact retro desktop music player. The development preview starts as a local folder player and adds internet radio; switch to YouTube Music to control your signed-in browser tab through the Chromium companion.
 
-Local playback is being introduced in a staged development branch. The published v0.4.1 downloads remain the YouTube Music remote described in their release notes.
+The local library and radio features are in a staged development branch. The published v0.4.1 downloads remain the YouTube Music remote described in their release notes.
 
 [![YTMamp demo video](https://img.youtube.com/vi/fHRDm8e2n-U/maxresdefault.jpg)](https://youtu.be/fHRDm8e2n-U)
 
@@ -16,6 +16,10 @@ Local playback is being introduced in a staged development branch. The published
 ## What it does
 
 - Add several music folders and their subfolders without copying audio. **ADD** opens the folder picker; **LIBRARY** shows tracks, albums and search. Local playback works without a browser or internet connection.
+- Select **RADIO** in the same source switch. The directory loads automatically; **LIBRARY** opens station cards, name/genre/language search, sorting, favorites and custom streams. Duplicate stream variants are combined, direct MP3/AAC/OGG streams are preferred, and HLS-only entries are omitted because this preview cannot play them. A failed address is excluded for five minutes; playback tries another cached compatible address for the same station, and **Retry stream** clears that cooldown.
+- In RADIO the progress strip becomes a retro FM dial. Prev/Next perform a short SEEK sweep with optional static, then tune the next/previous local frequency. Manual tuning remains available. macOS asks for the device location using Core Location; no city, country or region entry is required. Location is only for the local FM dial. Online stations work without it. Supplied frequency/coordinate data remains incomplete and is not a reception map.
+- Selecting **YT MUSIC** opens YouTube Music in the default browser if no connected session is known. Repeated switches have a 30-second cooldown; a connected session is not reopened. **OPEN** retries opening. The browser companion must still be installed and paired in that browser profile; opening the site alone does not pair it. Without a connected companion, the app cannot inspect arbitrary browser tabs and may open an additional tab.
+- **REC**, **II** and **STOP** record radio independently of playback. STOP opens the native Save As dialog for stereo 48 kHz/16-bit WAV. Cancel keeps the recording available for Save As or Discard. Pausing a recording excludes that interval while the station keeps playing.
 - Collapse the library with **COLLAPSE** or the **LIBRARY** toggle; reopening keeps its search and album selection without interrupting playback.
 - Choose **Player size** from a right click, the tray menu or **View**: 75%, 100%, 125% or 150%. The size is saved; 75% gives a 270 × 87 mini-player. Cmd/Ctrl `-`, `=` and `0` also change/reset size.
 - Use **_** to hide the player and keep music playing. Restore it from the menu-bar/tray icon or the Dock. **X** quits the app and stops playback. Explicit hiding also suppresses YouTube auto-show until you bring the player back.
@@ -39,6 +43,17 @@ Download the latest files from [GitHub Releases](https://github.com/markoblogo/Y
 
 Published release builds are currently unsigned and not notarized. Development Mac previews use ad-hoc signatures with archive verification; they are not Apple-notarized. Your operating system may ask you to confirm the first launch.
 
+### Development preview: local library and radio
+
+The current radio preview is **0.7.2** on the [`codex/radio-recording-stage3-20261111` branch](https://github.com/markoblogo/YTMamp/tree/codex/radio-recording-stage3-20261111). Its work is organized in three dependent draft pull requests: [local playback](https://github.com/markoblogo/YTMamp/pull/14), [music library](https://github.com/markoblogo/YTMamp/pull/15), and [radio](https://github.com/markoblogo/YTMamp/pull/16). These features are not yet part of the published release or the default branch.
+
+- [Download the Apple Silicon preview artifact](https://github.com/markoblogo/YTMamp/actions/runs/43116237066/artifacts/13898966284). GitHub sign-in is required; Actions artifacts expire. The outer ZIP contains the Mac app package and matching browser companion.
+- [CI for the preview code](https://github.com/markoblogo/YTMamp/actions/runs/43116237066) passed on macOS, Windows and Ubuntu, including generated-audio tests for the radio catalog, tuning controls and WAV capture. Its Mac package is ad-hoc signed and has not been notarized by Apple.
+- Interactive installation, actual station playback and recording still need to be checked with 0.7.2 on a Mac. The automatic checks do not establish that all real streams work or that recordings sound correct.
+- Local FM depends on supplied station frequency and location data. In a Nantes test, location was determined but the directory supplied no nearby FM matches, so real-station SEEK remains unverified. A suitable city-frequency source and stream matching are still needed.
+
+See the [test record](docs/smoke-test.md) and [development plan](docs/roadmap/multi-source-player.md) for the current evidence and remaining work.
+
 ## Set up in five steps
 
 1. Install and launch the desktop app. In the development preview, choose **ADD** and select your music folders for local listening. It remains available from the menu bar or system tray.
@@ -60,6 +75,12 @@ If the extension reports a missing receiver after an update, refresh the YouTube
 ## Privacy and network access
 
 The desktop bridge and HTTP API listen on the local machine by default. The extension runs only on `music.youtube.com` and stores its bridge token in the browser profile. Last.fm is disabled unless credentials are configured.
+
+Radio contacts the public Radio Browser directory for searches and a click counter on explicit station playback; audio and logos come from station servers, which see your IP address. Selecting RADIO requests device location for the local FM dial. On macOS a small bundled Core Location helper requests OS permission and asks Apple's geocoder for the city/country; no Google API key, IP geolocation or background tracking is used. The app receives rounded coordinates and saves them locally. If permission is denied or services are unavailable, the online catalog remains usable and there is a location retry control. A previously denied macOS permission was reported as a timeout during testing; check YTMamp under **System Settings > Privacy & Security > Location Services** before retrying. Local FM is a 60 km proximity list of supplied coordinates/frequencies, not a real reception map. It may be empty or incomplete.
+
+Station cards are checked progressively by briefly decoding muted previews on this device (at most three at once, 128 KiB and six seconds each). Successful checks are reused for 15 minutes; failed addresses are temporarily hidden for five minutes and favorites are retained. This is a recent availability check, not a guarantee that a station will stay online. Search pages contain 24 directory records; MORE STATIONS continues browsing.
+
+WAV recording uses about 11 MiB per minute, streams to a private temporary file and never buffers a whole recording in RAM. A session stops at 512 MiB or when less than 256 MiB is free; Save As can target an external drive. Canceled saves retain the temporary recording until it is saved or discarded. Switching away from RADIO stops recording and prompts to save. Quitting also prompts if a recording is unsaved. After an interrupted session the pending WAV is recovered in RADIO / LIBRARY. This preview has no MP3 encoder.
 
 LAN integrations are opt-in. Setting `INTEGRATION_HOST` to a non-loopback address requires `INTEGRATION_TOKEN`; browser controllers also require an explicit `CAST_ORIGIN_ALLOWLIST`. See the [integration API](docs/integration-api.md) and [bridge protocol](docs/protocol.md).
 

@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onLocalSelection: (callback) => ipcRenderer.on('local-selection', (_event, value) => callback(value)),
     onFolderNotice: (callback) => ipcRenderer.on('folder-notice', (_event, value) => callback(value)),
     setSource: (source) => ipcRenderer.send('set-source', source),
+    openYtm: () => ipcRenderer.send('open-ytm'),
+    onSourceNotice: (callback) => ipcRenderer.on('source-notice', (_event, value) => callback(value)),
     openMusicFolder: () => ipcRenderer.send('open-music-folder'),
     cancelFolderScan: () => ipcRenderer.send('cancel-folder-scan'),
     selectLocalTrack: (id, albumId) => ipcRenderer.send('select-local-track', id, albumId),
@@ -23,6 +25,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeLibraryFolder: (id) => ipcRenderer.send('remove-library-folder', id),
     reportLocalAudio: (report) => ipcRenderer.send('local-audio-report', report),
     setQueueVisible: (visible) => ipcRenderer.send('set-queue-visible', visible),
+    radio: (action, data) => ipcRenderer.invoke('radio-action', action, data),
+    onRadioAudioCommand: (callback) => ipcRenderer.on('radio-audio-command', (_event, value) => callback(value)),
+    onRadioSelection: (callback) => ipcRenderer.on('radio-selection', (_event, value) => callback(value)),
+    onRadioRecording: (callback) => ipcRenderer.on('radio-recording', (_event, value) => callback(value)),
+    reportRadioAudio: (report) => ipcRenderer.send('radio-audio-report', report),
+    recordRadioChunk: (data) => ipcRenderer.send('radio-record-chunk', data),
     quitApp: () => ipcRenderer.send('quit-app'),
     hideWindow: () => ipcRenderer.send('hide-window')
 });

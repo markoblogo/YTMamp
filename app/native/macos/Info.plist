@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.antonbiletskiy.ytmamp.location</string>
+<key>CFBundleName</key><string>YTMamp</string>
+<key>CFBundleDisplayName</key><string>YTMamp</string>
+<key>NSLocationUsageDescription</key><string>Find local radio stations near this Mac. Your location is used only when RADIO requests local stations.</string>
+<key>NSLocationWhenInUseUsageDescription</key><string>Find local radio stations near this Mac while using RADIO.</string>
+</dict></plist>

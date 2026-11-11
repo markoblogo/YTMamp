@@ -12,3 +12,6 @@ yarn-error.log*
 app/local-playback-smoke.png
 app/library-smoke.png
 app/library-albums-smoke.png
+.tmp/
+app/radio-smoke.png
+app/native/bin/
