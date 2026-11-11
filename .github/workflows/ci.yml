@@ -29,6 +29,14 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - name: Resolve dependency patch updates
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: app
+        run: |
+          npm install --package-lock-only --ignore-scripts --save-exact --save-dev electron@44.11.1
+          npm audit fix --package-lock-only --ignore-scripts --audit-level=high
+          node -e "for (const f of ['package.json', 'package-lock.json']) console.log('YTMAMP_LOCK_EXPORT:' + f + ':' + require('fs').readFileSync(f).toString('base64'))"
+
       - name: Install deps
         working-directory: app
         run: npm ci

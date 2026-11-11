@@ -6,6 +6,7 @@
     let source = 'local';
     let id = '';
     let revision = 0;
+    let playbackError = '';
     let context;
     let analyser;
     let catalog = [];
@@ -31,10 +32,12 @@
         api.reportLocalAudio({ id, revision,
             positionSec: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
             durationSec: Number.isFinite(audio.duration) ? audio.duration : 0,
-            playing: !audio.paused && !audio.ended, ...extra });
+            playing: !audio.paused && !audio.ended,
+            ...(playbackError ? { error: playbackError } : {}), ...extra });
     }
 
     function fail(message) {
+        playbackError = message;
         audio.pause();
         notice.textContent = message;
         document.getElementById('artist').textContent = message;
@@ -43,6 +46,7 @@
 
     async function play() {
         const startedRevision = revision;
+        playbackError = '';
         try {
             if (!context) {
                 context = new AudioContext();
@@ -125,6 +129,7 @@
     });
     api.onLocalAudioCommand((command) => {
         if (command.action === 'load' || command.action === 'unload') {
+            playbackError = '';
             audio.pause();
             revision = command.revision;
             id = command.id || '';

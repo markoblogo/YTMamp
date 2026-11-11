@@ -1183,7 +1183,7 @@ async function importMusicFolder(folder, restore = false) {
     try {
         const library = await scanMusicFolder(folder, { signal: controller.signal });
         controller.signal.throwIfAborted();
-        setPlaybackSource('local');
+        if (!restore) setPlaybackSource('local');
         localPlayer.pause();
         localPlayer.setLibrary(library, restore ? settings.localTrackId : '');
         settings.localFolder = library.root;
