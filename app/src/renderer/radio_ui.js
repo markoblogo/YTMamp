@@ -4,6 +4,13 @@
     const notice = (message) => { $('radio-notice').textContent = message; };
     const call = async (action, data) => { const result = await api.radio(action, data); if (result?.error) throw new Error(result.error); return result; };
     const verifier = new window.RadioStationVerifier({ report: (id, ok) => call('stream-check', { id, ok }) });
+    let ranks = new Map();
+    function sortRows() {
+        const sort = $('radio-sort').value;
+        if (view === 'local') rows.sort((a, b) => a.frequency - b.frequency || a.name.localeCompare(b.name));
+        else if (sort === 'popular') rows.sort((a, b) => (ranks.get(a.id) ?? Infinity) - (ranks.get(b.id) ?? Infinity));
+        else { const field = sort === 'country' ? 'countrycode' : sort; rows.sort((a, b) => String(a[field] || '').localeCompare(String(b[field] || ''), undefined, { sensitivity: 'base' }) || a.name.localeCompare(b.name)); }
+    }
     function updateDial() {
         const item = local.find((s) => s.id === selected);
         $('radio-dial').disabled = !local.length;
@@ -53,13 +60,14 @@
             if (view === 'local' && !local.length) { rows = []; $('radio-more').hidden = true; render(); notice(locating ? 'Finding local stations from your device location…' : 'No supplied FM frequencies nearby. All stations is available without local FM data.'); return; }
             const result = view === 'local' ? { stations: local.slice(offset, offset + 24), more: local.length > offset + 24 } : await call('search', query());
             if (ticket !== serial) return;
-            if (!more) rows = [];
+            if (!more) { rows = []; ranks = new Map(); }
+            result.stations.forEach((station, index) => ranks.set(station.id, offset + index));
             $('radio-more').hidden = !result.more || offset >= 1000;
             loaded = true;
             render(); notice('Checking station streams…');
             const checks = await verifier.verify(result.stations.slice(0, 24), (station) => {
                 if (ticket !== serial) return;
-                rows = [...new Map([...rows, station].map((s) => [s.id, s])).values()]; render();
+                rows = [...new Map([...rows, station].map((s) => [s.id, s])).values()]; sortRows(); render();
                 notice(rows.length + ' stations ready / checking more…');
             });
             if (ticket !== serial) return;

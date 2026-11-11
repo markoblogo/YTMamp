@@ -53,6 +53,8 @@ async function run(window) {
     await waitFor(() => evaluate('document.getElementById("radio-notice").textContent.includes("1 unavailable hidden")'), 'broken stream is checked and hidden');
     assert.equal(report?.playing === true, false, 'muted catalog checks must not start the main player');
     assert.equal(await evaluate('document.getElementById("radio-grid").textContent.includes("Broken station")'), false);
+    await evaluate('document.getElementById("radio-sort").value = "name"; document.getElementById("radio-sort").dispatchEvent(new Event("change"))');
+    await waitFor(() => evaluate('document.querySelector("#radio-grid .album-name")?.textContent === "Internet Only"'), 'name sorting survives progressive checks');
     assert.equal(await evaluate('document.getElementById("radio-country") === null && document.getElementById("radio-city") === null'), true);
     await action('location', { lat: 47.22, lon: -1.55, label: 'Nantes', countrycode: 'FR' });
     await evaluate('document.getElementById("radio-local").click()');

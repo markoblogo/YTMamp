@@ -8,8 +8,9 @@
         cancel() { this.controller?.abort(); }
         fresh(station) { return Number.isFinite(station.checkedAt) && Date.now() - station.checkedAt >= 0 && Date.now() - station.checkedAt < 900000; }
         async check(station, signal) {
-            if (signal.aborted || !this.online()) return null;
+            if (signal.aborted) return null;
             if (this.fresh(station)) return true;
+            if (!this.online()) return null;
             const audio = this.createAudio(); audio.muted = true; audio.preload = 'none'; audio.crossOrigin = 'anonymous';
             return new Promise((resolve) => {
                 let finished = false;
