@@ -29,6 +29,13 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - name: Resolve pinned metadata reader
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: app
+        run: |
+          npm install --package-lock-only --ignore-scripts --save-exact music-metadata@12.4.0
+          node -e "for (const f of ['package.json', 'package-lock.json']) console.log('YTMAMP_STAGE2_EXPORT:' + f + ':' + require('fs').readFileSync(f).toString('base64'))"
+
       - name: Install deps
         working-directory: app
         run: npm ci
