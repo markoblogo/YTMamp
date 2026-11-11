@@ -18,6 +18,22 @@ test('radio URLs reject local, mapped, credential and non-HTTP destinations', ()
     assert.equal(checkedUrl('https://radio.example.org:8443/stream').protocol, 'https:');
     assert.equal(publicAddress('8.8.8.8'), true); assert.equal(publicAddress('100.100.1.2'), false);
     assert.equal(publicAddress('2606:4700:4700::1111'), true); assert.equal(publicAddress('fd00::1'), false);
+    assert.equal(publicAddress('2001:4860:4860::8888'), true);
+    assert.equal(publicAddress('2001:0000::1'), false); assert.equal(publicAddress('2001:db8::1'), false);
+});
+
+test('catalog merges duplicate streams, prefers supported direct audio and temporarily excludes failures', async (t) => {
+    const list = [raw('FIP', 'https://example.org/hls', { hls: 1 }), raw('Fip', 'https://example.org/direct', { codec: 'AAC' }), raw('FIP', 'https://example.org/direct2', { codec: 'MP3' }), raw('Dead', 'https://example.org/dead', { lastcheckok: 0 }), raw('HLS Only', 'https://example.org/only', { hls: 1 })];
+    const { directory, library } = fixture(t, { search: async () => list });
+    const results = await library.search();
+    assert.equal(results.stations.length, 1); assert.equal(results.stations[0].hls, false);
+    const id = results.stations[0].id;
+    library.markFailed(id); assert.equal(library.usable(library.stations.get(id)), false);
+    assert.equal(library.alternatives(id).length, 1);
+    assert.equal(new RadioLibrary({ directory }).failed.has(id), true);
+    assert.equal((await library.search()).stations.length, 1, 'working alternate stays visible');
+    library.retryStation(id); assert.equal(library.failed.has(id), false);
+    library.markFailed(id); library.markSuccessful(id); assert.equal(library.failed.has(id), false);
 });
 test('FM parsing requires an explicit band/unit and never invents frequencies', () => {
     assert.equal(frequency('Radio Jazz 92.1 FM'), 92.1); assert.equal(frequency('FM 101,3 Jazz'), 101.3);
@@ -36,7 +52,7 @@ test('search combines provider filters, sorts, persists favorites and handles di
     assert.equal(restored.favorites.size, 1); assert.equal(restored.snapshot().stations[0].favorite, true);
     fail = true;
     const cached = await library.search({ name: 'alpha', genre: 'jazz', country: 'FR' });
-    assert.equal(cached.cached, true); assert.equal(cached.stations.length, 1); assert.ok(cached.error);
+    assert.equal(cached.cached, true); assert.equal(cached.stations.length, 1); assert.ok(cached.warning);
     assert.equal(filterStations([...library.stations.values()], { name: 'zebre', language: 'French' }).length, 1);
 });
 test('local dial has only nearby supplied frequencies; custom local values follow location', async (t) => {

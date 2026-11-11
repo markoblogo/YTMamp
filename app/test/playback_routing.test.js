@@ -14,6 +14,7 @@ async function appFixture(t) {
     const requireFromMain = createRequire(filename);
     const messages = [];
     const relayed = [];
+    const opened = [];
     const handlers = new Map();
     let bridgeOptions;
     const bounds = { x: 1000, y: 600, width: 360, height: 116 };
@@ -26,6 +27,7 @@ async function appFixture(t) {
         setPosition: (x, y) => Object.assign(bounds, { x, y }),
         webContents: { send: (name, value) => messages.push({ name, value }), setZoomFactor: (value) => { zoomFactor = value; } } };
     const electron = {
+        shell: { openExternal: async (url) => { opened.push(url); } },
         app: { getPath: () => dir, on() {}, whenReady: () => ({ then() {} }) },
         protocol: { registerSchemesAsPrivileged() {}, handle() {} },
         screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1200, height: 700 } }) },
@@ -56,7 +58,7 @@ async function appFixture(t) {
         { id: 'b'.repeat(64), title: 'Second', artist: 'Music', relativePath: 'second.wav', filePath: path.join(dir, 'second.wav') }
     ] };
     vm.runInContext('localPlayer.setLibrary(testLibrary);', context);
-    return { context, messages, relayed, handlers, event, bridgeOptions, bounds, zoom: () => zoomFactor, visible: () => visible, directory: dir,
+    return { context, messages, relayed, opened, handlers, event, bridgeOptions, bounds, zoom: () => zoomFactor, visible: () => visible, directory: dir,
         snapshot: () => JSON.parse(vm.runInContext('JSON.stringify({ source: activeSource, track: playerState.track, state: playerState.state })', context)) };
 }
 
@@ -70,6 +72,19 @@ test('desktop starts local, routes controls locally and ignores inactive YouTube
     assert.equal(fixture.snapshot().track.title, 'Second');
     assert.equal(fixture.relayed.length, 0);
     assert.equal(fixture.messages.filter((message) => message.name === 'local-audio-command').at(-1).value.autoplay, true);
+});
+
+test('YouTube source opens the default browser when absent, but never duplicates a connected session', async (t) => {
+    const fixture = await appFixture(t);
+    fixture.handlers.get('set-source')(fixture.event, 'ytm');
+    assert.deepEqual(fixture.opened, ['https://music.youtube.com/']);
+    fixture.handlers.get('set-source')(fixture.event, 'local');
+    fixture.handlers.get('set-source')(fixture.event, 'ytm');
+    assert.equal(fixture.opened.length, 1);
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'track', title: 'YT song', artist: 'YT' });
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'status', msg: 'Client connected' });
+    fixture.handlers.get('open-ytm')(fixture.event);
+    assert.equal(fixture.opened.length, 1);
 });
 
 test('source switching pauses outgoing local audio and sends an idempotent YouTube pause', async (t) => {

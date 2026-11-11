@@ -1,4 +1,5 @@
 const { app, dialog, ipcMain, Menu } = require('electron');
+require('electron').shell.openExternal = async () => {};
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

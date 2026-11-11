@@ -1,0 +1,15 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+if (process.platform !== 'darwin') process.exit(0);
+const root = path.resolve(__dirname, '..');
+const output = path.join(root, 'native/bin'); fs.mkdirSync(output, { recursive: true });
+const source = path.join(root, 'native/macos/Location.swift');
+const info = path.join(root, 'native/macos/Info.plist');
+const binary = path.join(output, 'ytmamp-location');
+const arch = (process.env.YTMAMP_LOCATION_ARCH || process.arch).replace('x64', 'x86_64');
+if (!['arm64', 'x86_64'].includes(arch)) throw new Error('Unsupported Mac helper architecture.');
+execFileSync('xcrun', ['swiftc', source, '-O', '-module-cache-path', path.join(output, 'ModuleCache'), '-target', arch + '-apple-macosx12.0', '-framework', 'CoreLocation', '-framework', 'AppKit', '-Xlinker', '-sectcreate', '-Xlinker', '__TEXT', '-Xlinker', '__info_plist', '-Xlinker', info, '-o', binary], { stdio: 'inherit' });
+execFileSync('codesign', ['--force', '--sign', '-', binary], { stdio: 'inherit' });
+execFileSync(binary, ['--check'], { stdio: 'inherit' });
+console.log('Built macOS Core Location helper for ' + arch + '.');

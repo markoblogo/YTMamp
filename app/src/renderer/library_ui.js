@@ -125,7 +125,7 @@
     $('library-refresh').addEventListener('click', () => api.refreshLibrary());
     $('queue-more').addEventListener('click', appendResults);
     $('cancel-scan').addEventListener('click', () => api.cancelFolderScan());
-    api.onSourceChange((value) => { source = value; $('source-select').value = value; $('queue-toggle').disabled = value === 'ytm'; $('open-folder').hidden = value !== 'local'; setVisible(visible && value !== 'ytm'); updateSelection(); });
+    api.onSourceChange((value) => { source = value; $('source-select').value = value; $('queue-toggle').disabled = value === 'ytm'; $('open-folder').hidden = value !== 'local'; $('open-ytm').hidden = value !== 'ytm'; setVisible(visible && value !== 'ytm'); updateSelection(); });
     api.onLocalCatalog((catalog) => {
         tracks = catalog.tracks; roots = catalog.roots || [];
         if (albumId && !tracks.some((track) => track.albumId === albumId)) albumId = '';

@@ -2,9 +2,9 @@
     const api = window.electronAPI;
     const audio = new Audio(); audio.preload = 'none'; audio.crossOrigin = 'anonymous';
     let source = 'local'; let id = ''; let revision = 0; let context; let analyser; let gain; let capture;
-    let volume = 0.5; let stallTimer; let loadTimer; let noise; let ready;
+    let volume = 0.5; let stallTimer; let loadTimer; let noise; let ready; let tuningFrame; let finishTuning;
     const samples = new Uint8Array(128);
-    const report = (data) => { if (source === 'radio' && id) api.reportRadioAudio({ id, revision, playing: !audio.paused, ...data }); };
+    const report = (data) => { if (source === 'radio' && id) api.reportRadioAudio({ id, revision, playing: !audio.paused, offline: navigator.onLine === false, ...data }); };
     async function initialize() {
         if (ready) return ready;
         ready = (async () => {
@@ -23,16 +23,31 @@
         return ready;
     }
     function stopNoise() { if (noise) { try { noise.stop(); } catch { /* already stopped */ } noise = null; } }
-    function tuningNoise() {
+    function tuningNoise(seconds) {
         stopNoise(); if (!context || context.state !== 'running') return;
-        const buffer = context.createBuffer(1, Math.round(context.sampleRate * 0.25), context.sampleRate);
+        const buffer = context.createBuffer(1, Math.round(context.sampleRate * seconds), context.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (Math.random() > 0.998 ? 0.7 : 0.16) * (1 - i / data.length);
         noise = context.createBufferSource(); noise.buffer = buffer;
         const level = context.createGain(); level.gain.value = volume * 0.2;
-        noise.connect(level); level.connect(context.destination); noise.start(); noise.stop(context.currentTime + 0.25);
+        noise.connect(level); level.connect(context.destination); noise.start(); noise.stop(context.currentTime + seconds);
     }
-    function stop() { clearTimeout(stallTimer); clearTimeout(loadTimer); audio.pause(); audio.removeAttribute('src'); audio.load(); stopNoise(); }
+    function sweep(from, to, milliseconds, startedRevision) {
+        if (!Number.isFinite(from) || !Number.isFinite(to)) return Promise.resolve();
+        const start = performance.now();
+        return new Promise((resolve) => {
+            finishTuning = resolve;
+            const frame = () => {
+                if (revision !== startedRevision || source !== 'radio') { resolve(); return; }
+                const progress = Math.min(1, (performance.now() - start) / milliseconds);
+                const value = from + (to - from) * progress;
+                document.getElementById('radio-dial').value = value;
+                document.getElementById('radio-frequency').textContent = value.toFixed(1) + ' MHz / ' + (progress < 1 ? 'SEEK' : 'TUNED');
+                if (progress < 1) tuningFrame = requestAnimationFrame(frame); else { finishTuning = null; resolve(); }
+            }; frame();
+        });
+    }
+    function stop() { clearTimeout(stallTimer); clearTimeout(loadTimer); if (tuningFrame) cancelAnimationFrame(tuningFrame); if (finishTuning) { finishTuning(); finishTuning = null; } audio.pause(); audio.removeAttribute('src'); audio.load(); stopNoise(); }
     api.onSourceChange((value) => { source = value; if (value !== 'radio') { stop(); capture?.port.postMessage(false); context?.suspend().catch(() => {}); } });
     api.onRadioAudioCommand(async (command) => {
         if (command.action === 'pause') { revision = command.revision; stop(); return; }
@@ -44,7 +59,12 @@
             await initialize(); await context.resume();
             if (source !== 'radio' || revision !== started) return;
             gain.gain.value = volume;
-            if (command.tuning && document.getElementById('radio-noise').checked) tuningNoise();
+            if (command.tuning) {
+                const milliseconds = Math.max(350, Math.min(1200, Math.abs((command.frequency || 0) - (command.fromFrequency || 0)) * 65));
+                if (document.getElementById('radio-noise').checked) tuningNoise(milliseconds / 1000);
+                await sweep(command.fromFrequency, command.frequency, milliseconds, started);
+                if (source !== 'radio' || revision !== started) return;
+            }
             audio.src = command.url;
             loadTimer = setTimeout(() => { if (revision === started) { audio.pause(); report({ playing: false, error: true }); } }, 16000);
             await audio.play();

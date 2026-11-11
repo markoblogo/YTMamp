@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onLocalSelection: (callback) => ipcRenderer.on('local-selection', (_event, value) => callback(value)),
     onFolderNotice: (callback) => ipcRenderer.on('folder-notice', (_event, value) => callback(value)),
     setSource: (source) => ipcRenderer.send('set-source', source),
+    openYtm: () => ipcRenderer.send('open-ytm'),
+    onSourceNotice: (callback) => ipcRenderer.on('source-notice', (_event, value) => callback(value)),
     openMusicFolder: () => ipcRenderer.send('open-music-folder'),
     cancelFolderScan: () => ipcRenderer.send('cancel-folder-scan'),
     selectLocalTrack: (id, albumId) => ipcRenderer.send('select-local-track', id, albumId),

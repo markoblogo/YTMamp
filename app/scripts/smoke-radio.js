@@ -1,4 +1,5 @@
 const { app, dialog, ipcMain } = require('electron');
+require('electron').shell.openExternal = async () => {};
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -6,6 +7,7 @@ const path = require('node:path');
 const { taggedWav } = require('./audio-fixture');
 const { RadioLibrary } = require('../src/main/radio_library');
 const network = require('../src/main/radio_network');
+require('../src/main/device_location').locateMac = async () => ({ lat: 47.22, lon: -1.55, label: 'Test location', countrycode: 'FR' });
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ytmamp-radio-desktop-'));
 const output = path.join(temporary, 'recorded.wav');
 app.setPath('userData', temporary); app.setLoginItemSettings = () => {};
@@ -43,6 +45,7 @@ async function run(window) {
     await waitFor(() => evaluate('document.body.classList.contains("radio-mode")'), 'radio source');
     await evaluate('document.getElementById("queue-toggle").click(); document.getElementById("radio-search-form").requestSubmit()');
     await waitFor(() => evaluate('document.querySelectorAll("#radio-grid .album-card").length === 3'), 'radio cards');
+    assert.equal(await evaluate('document.getElementById("radio-country") === null && document.getElementById("radio-city") === null'), true);
     await action('location', { lat: 47.22, lon: -1.55, label: 'Nantes', countrycode: 'FR' });
     await evaluate('document.getElementById("radio-local").click()');
     await waitFor(() => evaluate('document.querySelectorAll("#radio-grid .album-card").length === 2'), 'local frequency cards');

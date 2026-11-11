@@ -1,6 +1,7 @@
 // Runs the real desktop entry point against generated audio and isolated settings.
 // Never reads the owner's music, modifies login items or produces audible sound.
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+require('electron').shell.openExternal = async () => {};
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

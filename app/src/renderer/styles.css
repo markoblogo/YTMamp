@@ -56,7 +56,7 @@ body {
     align-items: center;
 }
 
-#source-select, #open-folder, #queue-toggle {
+#source-select, #open-folder, #open-ytm, #queue-toggle {
     -webkit-app-region: no-drag;
     font: inherit;
     letter-spacing: 0;

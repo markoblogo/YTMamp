@@ -18,6 +18,7 @@
                 <option value="radio">RADIO</option>
             </select>
             <button id="open-folder" title="Add music folders" aria-label="Add music folders">ADD</button>
+            <button id="open-ytm" title="Open YouTube Music in your default browser. Connect the companion extension to control it." aria-label="Open YouTube Music in default browser" hidden>OPEN</button>
             <button id="queue-toggle" aria-label="Open music library" aria-expanded="false" aria-controls="local-queue">LIBRARY</button>
             <div id="status-group">
                 <div id="vol-status">VOL: --</div>
@@ -116,10 +117,9 @@
         <div class="radio-filters">
             <input id="radio-genre" placeholder="Genre" aria-label="Radio genre" maxlength="100">
             <input id="radio-language" placeholder="Language" aria-label="Radio language" maxlength="100">
-            <input id="radio-country" placeholder="Country code: FR" aria-label="Radio country ISO code" maxlength="2">
-            <input id="radio-region" placeholder="Region" aria-label="Radio region" maxlength="100">
             <select id="radio-sort" aria-label="Sort radio stations"><option value="name">Name</option><option value="genre">Genre</option><option value="language">Language</option><option value="country">Country</option><option value="region">Region</option></select>
         </div>
+        <div class="radio-toolbar" id="radio-location-toolbar"><button id="radio-locate" type="button">Use device location</button><span id="radio-location-label" role="status">Local FM uses your device location; online stations work everywhere.</span></div>
         <div class="radio-toolbar">
             <button id="radio-all" aria-pressed="true">All stations</button><button id="radio-favorites" aria-pressed="false">Favorites</button><button id="radio-local" aria-pressed="false">Local FM</button>
             <button id="radio-retry">Retry stream</button>
@@ -127,15 +127,11 @@
             <span id="radio-record-status" role="status"></span>
         </div>
         <details id="radio-settings">
-            <summary>Location, local frequencies and custom streams</summary>
-            <form id="radio-location-form" class="radio-toolbar">
-                <input id="radio-city" placeholder="City for local stations" aria-label="Radio location city" maxlength="120"><button type="submit">Find city</button><button id="radio-locate" type="button">Use device location</button>
-            </form>
-            <div class="radio-toolbar"><select id="radio-places" aria-label="Choose radio location"></select><button id="radio-place-use">Use this location</button><span id="radio-location-label">Location not set</span></div>
+            <summary>Custom streams and local frequencies</summary>
             <form id="radio-custom-form" class="radio-toolbar"><input id="radio-custom-name" placeholder="Station name" aria-label="Custom station name" maxlength="200" required><input id="radio-custom-url" placeholder="https://… direct audio stream" type="url" aria-label="Custom station stream URL" maxlength="4096" required><button type="submit">Add stream</button></form>
-            <p>FM shows local stations with a supplied frequency, within 60 km. Coverage is incomplete. Use “Set local FM” on a card to enter an actual local frequency. Online-only stations stay in the catalog. City search: Open-Meteo / GeoNames.</p>
+            <p>FM uses the device location and supplied frequencies within 60 km. Coverage may be incomplete. General station search works without location permission.</p>
         </details>
-        <p id="radio-notice" role="status">Search the worldwide Radio Browser directory, or choose a location for local FM.</p>
+        <p id="radio-notice" role="status">Loading online stations. Location is used only for the local FM dial.</p>
         <div id="radio-results"><div id="radio-grid"></div><button id="radio-more" hidden>More stations</button></div>
         <div id="radio-pending" hidden><span>Unsaved recording</span><button id="radio-save">Save as…</button><button id="radio-discard">Discard</button></div>
     </section>

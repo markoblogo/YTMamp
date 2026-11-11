@@ -32,6 +32,8 @@ Owner UI requirement, 11 November 2026: keep the transport as the compact mini-p
 
 ## Radio requirements for the next stage
 
+0.7.1 owner feedback pass: local playback is confirmed good. Fix source onboarding before the audit/release pass: auto-open YT Music in the default browser when disconnected, automatically request native macOS device location for local FM, remove mandatory/manual city/country/region entry, automatically load the radio catalog, group duplicate compatible streams, temporarily suppress failed addresses and replace stale errors with LIVE feedback. Prev/Next should perform an animated SEEK sweep along known local frequencies, with the existing manual dial retained. No invented frequency or background RF scan. A native Core Location helper replaces the unreliable Google-dependent browser location provider on Mac. This pass remains subject to CI packaging and native OS-permission acceptance.
+
 The owner combined radio and the pending hide button into one 0.7.0 installation/test pass. Stop after that pass and review before starting YouTube embedding or vinyl.
 
 - One LOCAL / YT MUSIC / RADIO source switch. The existing LIBRARY button opens the corresponding music or radio panel; COLLAPSE keeps playback running. No extra permanent catalog button.

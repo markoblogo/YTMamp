@@ -1,4 +1,6 @@
-const { app, BrowserWindow, clipboard, ipcMain, Tray, Menu, nativeImage, screen, dialog, protocol } = require('electron');
+const { app, BrowserWindow, clipboard, ipcMain, Tray, Menu, nativeImage, screen, dialog, protocol, shell } = require('electron');
+const { createYtmLauncher } = require('./ytm_launcher');
+const { locateMac } = require('./device_location');
 const { pathToFileURL } = require('node:url');
 const { LocalCollection } = require('./local_collection');
 const { createLocalMediaHandler } = require('./local_media');
@@ -59,6 +61,7 @@ let radioQuitAccepted = false;
 let radioQuitPrompt = false;
 let radioActionBusy = false;
 let radioLocationPermissionUntil = 0;
+const launchYtm = createYtmLauncher({ openExternal: (url) => shell.openExternal(url) });
 const localPlayer = new LocalPlayer();
 const pluginRuntimeStatusQueue = [];
 const pluginRuntimeUiQueue = [];
@@ -1269,8 +1272,14 @@ function setPlaybackSource(source) {
     else {
         publishPlayerEvent('track', ytmSnapshot.track ? sanitizeTrackMessage(ytmSnapshot.track) : null, { dedupeMs: 0 });
         publishState(ytmSnapshot.state || { playing: false });
+        openYtmIfNeeded();
     }
     updateTrayMenu();
+}
+
+function openYtmIfNeeded(force = false) {
+    const connected = /connected/i.test(ytmStatus) && !!ytmSnapshot.track;
+    launchYtm({ connected, force }).catch((error) => mainWindow?.webContents.send('source-notice', error.message));
 }
 
 function sendFolderNotice(message, busy = false) {
@@ -1392,7 +1401,15 @@ async function radioAction(event, action, data = {}) {
     try {
         if (action === 'snapshot') return radioLibrary.snapshot();
         if (action === 'search') return await radioLibrary.search(data);
-        if (action === 'device-location') { radioLocationPermissionUntil = Date.now() + 15000; return { ok: true }; }
+        if (action === 'device-location') {
+            if (process.platform !== 'darwin') { radioLocationPermissionUntil = Date.now() + 20000; return { browser: true }; }
+            if (radioActionBusy) return { error: 'Finding the device location. Please wait.' };
+            radioActionBusy = true;
+            try {
+                const location = await locateMac({ appPath: app.getAppPath(), packaged: app.isPackaged });
+                const result = await radioLibrary.chooseLocation(location); radioPlayer.publish(); return result;
+            } finally { radioActionBusy = false; }
+        }
         if (action === 'location') {
             if (radioActionBusy) return { error: 'Location lookup is already running.' };
             radioActionBusy = true;
@@ -1403,8 +1420,9 @@ async function radioAction(event, action, data = {}) {
         if (action === 'frequency') { radioLibrary.setFrequency(data.id, data.value); radioPlayer.publish(); return { ok: true }; }
         if (action === 'play' || action === 'tune') {
             if (activeSource !== 'radio') return { error: 'Select RADIO first.' };
+            if (data.retry === true) radioLibrary.retryStation(data.id);
             if (action === 'tune' && !radioLibrary.local().some((station) => station.id === data.id)) return { error: 'Not a local FM station.' };
-            if (!radioPlayer.select(data.id, { tuning: action === 'tune' })) return { error: 'Search for this station again.' };
+            if (!radioPlayer.select(data.id, { tuning: action === 'tune' })) return { error: 'This station has no supported direct stream. Choose another station.' };
             if (action === 'play') radioLibrary.browser.click(radioPlayer.current.uuid);
             return { ok: true };
         }
@@ -1424,6 +1442,7 @@ async function radioAction(event, action, data = {}) {
 }
 
 function setupIpc() {
+    ipcMain.on('open-ytm', (event) => { if (isPlayerSender(event)) openYtmIfNeeded(true); });
     ipcMain.handle('radio-action', radioAction);
     ipcMain.on('radio-audio-report', (event, report) => { if (isPlayerSender(event) && activeSource === 'radio') radioPlayer.receive(report); });
     let lastRecordingStatus = 0;

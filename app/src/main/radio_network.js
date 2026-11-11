@@ -3,6 +3,10 @@ const https = require('node:https');
 const dns = require('node:dns/promises');
 const net = require('node:net');
 const { Readable } = require('node:stream');
+const nonPublicV6 = new net.BlockList();
+nonPublicV6.addSubnet('2001::', 32, 'ipv6');
+nonPublicV6.addSubnet('2001:db8::', 32, 'ipv6');
+nonPublicV6.addSubnet('2002::', 16, 'ipv6');
 
 function publicAddress(address) {
     if (net.isIP(address) === 4) {
@@ -14,7 +18,7 @@ function publicAddress(address) {
     }
     // Reject mapped, local, multicast and transition addresses. Public global unicast only.
     return net.isIP(address) === 6 && /^[23][0-9a-f]{3}:/i.test(address) &&
-        !/^200[12]:/i.test(address) && !/^2001:db8:/i.test(address);
+        !nonPublicV6.check(address, 'ipv6');
 }
 function checkedUrl(value) {
     const url = new URL(value);
@@ -24,7 +28,7 @@ function checkedUrl(value) {
     if (net.isIP(ip) && !publicAddress(ip)) throw new Error('Private network addresses are not supported.');
     return url;
 }
-async function openRemote(value, { signal, userAgent = 'YTMamp/0.7.0', redirects = 5 } = {}) {
+async function openRemote(value, { signal, userAgent = 'YTMamp/0.7.1', redirects = 5 } = {}) {
     const url = checkedUrl(value);
     signal?.throwIfAborted();
     const host = url.hostname.replace(/^\[|\]$/g, '');
@@ -34,7 +38,8 @@ async function openRemote(value, { signal, userAgent = 'YTMamp/0.7.0', redirects
     signal?.throwIfAborted();
     if (!addresses.length || addresses.some(({ address }) => !publicAddress(address))) throw new Error('Station address is not public.');
     return new Promise((resolve, reject) => {
-        const chosen = addresses[0];
+        // Prefer IPv4 where the Mac has no working IPv6 route; all answers remain validated.
+        const chosen = addresses.find((item) => item.family === 4) || addresses[0];
         const request = (url.protocol === 'https:' ? https : http).get(url, {
             signal, agent: false, headers: { 'user-agent': userAgent, accept: '*/*', 'icy-metadata': '0' },
             lookup: (_hostname, options, callback) => options.all ? callback(null, [chosen]) : callback(null, chosen.address, chosen.family)
