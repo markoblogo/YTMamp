@@ -117,3 +117,8 @@ All notable changes to this project will be documented in this file.
 - Add isolated Electron playback automation and an Apple Silicon preview artifact. Whole-computer audio discovery is excluded; multiple-folder library, metadata, radio and vinyl remain subsequent stages.
 - Update Electron to 44.11.1 and compatible locked transitive dependency patches to pass the high-severity dependency check.
 
+## Stage 1 macOS installation follow-up
+
+- Confirmed local playback on the owner's Mac with the MyMusic folder (15 tracks).
+- Corrected ad-hoc signing for Apple Silicon previews. Pull-request builds had skipped signing, leaving an invalid outer Electron bundle signature.
+- Added strict verification of the built app and the app extracted from the preview ZIP before uploading installers. Preview signing requires no developer certificate; Apple notarization remains a later release task.

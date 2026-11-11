@@ -43,6 +43,7 @@
       "buildResources": "assets"
     },
     "mac": {
+      "identity": "-",
       "target": [
         "dmg",
         "zip"

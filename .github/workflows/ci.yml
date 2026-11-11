@@ -52,7 +52,19 @@ jobs:
       - name: Build Apple Silicon preview
         if: matrix.os == 'macos-latest'
         working-directory: app
+        env:
+          # Ad-hoc signing uses no certificate or signing secrets. The explicit
+          # mac.identity='-' must also be honored for pull-request previews.
+          CSC_FOR_PULL_REQUEST: 'true'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist:mac -- --arm64
+
+      - name: Verify Apple Silicon signatures and ZIP
+        if: matrix.os == 'macos-latest'
+        run: |
+          codesign --verify --deep --strict --verbose=2 app/dist/mac-arm64/YTMamp.app
+          ditto -x -k app/dist/YTMamp-0.5.0-mac.zip "$RUNNER_TEMP/ytmamp-preview-verify"
+          codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/ytmamp-preview-verify/YTMamp.app"
 
       - name: Bundle matching browser companion
         if: matrix.os == 'macos-latest'
