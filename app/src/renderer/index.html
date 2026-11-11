@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src ytmamp-media:; connect-src 'none'; object-src 'none'; base-uri 'none'">
     <title>YTMamp</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -12,6 +12,12 @@
     <div id="container">
         <div id="top-region">
             <span>YTMAMP</span>
+            <select id="source-select" aria-label="Playback source">
+                <option value="local">LOCAL</option>
+                <option value="ytm">YT MUSIC</option>
+            </select>
+            <button id="open-folder" title="Open music folder" aria-label="Open music folder">FOLDER</button>
+            <button id="queue-toggle" aria-expanded="false" aria-controls="local-queue">LIST</button>
             <div id="status-group">
                 <div id="vol-status">VOL: --</div>
                 <div id="status-led" title="Offline"></div>
@@ -26,7 +32,7 @@
             <div id="right-panel">
                 <div id="info-container">
                     <div id="title">YTMamp</div>
-                    <div id="artist">Waiting for tab...</div>
+                    <div id="artist">Choose a music folder</div>
                 </div>
                 <div id="timer-container">
                     <div id="timer">00:00 / 00:00</div>
@@ -34,7 +40,7 @@
                 <div id="progress-container">
                     <div id="progress-track"></div>
                     <div id="progress-fill"></div>
-                    <input type="range" id="progress-bar" min="0" max="100" value="0">
+                    <input type="range" id="progress-bar" aria-label="Track position" min="0" max="100" value="0">
                 </div>
             </div>
         </div>
@@ -50,13 +56,22 @@
             </div>
             <div id="volume-container">
                 <span id="volume-label">VOL</span>
-                <input type="range" id="volume-slider" min="0" max="100" value="50">
+                <input type="range" id="volume-slider" aria-label="Volume" min="0" max="100" value="50">
             </div>
         </div>
         <div id="plugin-panels" aria-live="polite"></div>
         <div id="debug-info"></div>
     </div>
+    <section id="local-queue" aria-label="Local music queue" hidden>
+        <div id="folder-row">
+            <p id="folder-notice" role="status">Choose a folder. Music stays in its original location.</p>
+            <button id="cancel-scan" hidden>Cancel</button>
+        </div>
+        <ol id="queue-tracks"></ol>
+        <button id="queue-more" hidden>Show more tracks</button>
+    </section>
     <script src="renderer.js"></script>
+    <script src="local_audio.js"></script>
 </body>
 
 </html>

@@ -24,6 +24,7 @@
     "lint": "node scripts/check-js.js",
     "test": "node --test && npm run test:smoke",
     "test:smoke": "node --test test/integration_api_smoke.test.js",
+    "test:desktop": "electron scripts/smoke-local-playback.js",
     "check": "npm run lint && npm test",
     "pack": "npm run clean && electron-builder --dir --publish never"
   },

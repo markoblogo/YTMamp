@@ -28,7 +28,10 @@ window.electronAPI.onStatusChange((status) => {
     const statusUpper = status.toUpperCase();
 
     led.className = ''; // reset
-    if (statusUpper.includes('CONNECTED')) {
+    if (statusUpper === 'LOCAL') {
+        led.classList.add('connected');
+        led.title = 'Local music (works offline)';
+    } else if (statusUpper.includes('CONNECTED')) {
         led.classList.add('connected');
         led.title = 'Connected';
     } else if (statusUpper.includes('NEED') || statusUpper.includes('WAITING')) {
@@ -127,6 +130,12 @@ window.electronAPI.onWaveUpdate((msg) => {
 });
 
 function draw() {
+    const localWave = window.readLocalWave?.();
+    if (localWave) {
+        lastWaveData = localWave;
+        lastWaveTime = Date.now();
+        useFallback = false;
+    }
     // Check if wave data is fresh
     if (!useFallback && Date.now() - lastWaveTime > 500) {
         useFallback = true;
@@ -183,6 +192,11 @@ window.electronAPI.onVolStatus((status) => {
 // (Declarations moved to top)
 
 window.electronAPI.onTrackUpdate((track) => {
+    if (!track) {
+        document.getElementById('title').innerText = 'YTMamp';
+        document.getElementById('artist').innerText = 'Choose a source or music folder';
+        return;
+    }
     document.getElementById('title').innerText = track.title;
     document.getElementById('artist').innerText = track.artist;
 
@@ -309,6 +323,8 @@ function logStats() {
 // (Declarations moved to top)
 
 window.electronAPI.onStateUpdate((state) => {
+    document.getElementById('play-pause-btn').textContent = state.playing ? 'Pause' : 'Play';
+    document.getElementById('play-pause-btn').setAttribute('aria-label', state.playing ? 'Pause playback' : 'Start playback');
     lastDuration = state.durationSec;
     if (isSeeking) return;
 

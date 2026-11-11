@@ -1,4 +1,12 @@
-const { app, BrowserWindow, clipboard, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, clipboard, ipcMain, Tray, Menu, nativeImage, screen, dialog, protocol } = require('electron');
+const { pathToFileURL } = require('node:url');
+const { scanMusicFolder } = require('./local_library');
+const { createLocalMediaHandler } = require('./local_media');
+const { LocalPlayer } = require('./local_player');
+
+protocol.registerSchemesAsPrivileged([{ scheme: 'ytmamp-media', privileges: {
+    standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true
+} }]);
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -30,6 +38,12 @@ let bridge;
 let isQuitting = false;
 let pluginRuntime;
 let lastfmScrobbler;
+let activeSource = 'local';
+let ytmStatus = 'Need YTM Tab';
+const ytmSnapshot = { track: null, state: null };
+let folderScan;
+let choosingFolder = false;
+const localPlayer = new LocalPlayer();
 const pluginRuntimeStatusQueue = [];
 const pluginRuntimeUiQueue = [];
 const playerStateBus = createEventBus({ dedupeWindowMs: 350 });
@@ -59,7 +73,7 @@ const MAX_SSE_CLIENTS = 25;
 let integrationServer;
 const integrationSseClients = new Set();
 const integrationRateBuckets = new Map();
-let appStatus = 'OFFLINE';
+let appStatus = 'LOCAL';
 const obsOverlay = createObsOverlayService({
     allowlist: OBS_ORIGIN_ALLOWLIST,
     logger: {
@@ -695,7 +709,10 @@ let settings = {
     startAtLogin: false,
     autoShowOnPlay: true,
     windowBounds: null,
-    bridgeAuthToken: ''
+    bridgeAuthToken: '',
+    localFolder: '',
+    localTrackId: '',
+    localVolume: 0.5
 };
 
 function loadSettings() {
@@ -931,6 +948,16 @@ function createWindow() {
     mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
+    mainWindow.webContents.on('did-finish-load', () => {
+        mainWindow.webContents.send('source-change', activeSource);
+        mainWindow.webContents.send('local-catalog', localPlayer.catalog());
+        if (activeSource === 'local') {
+            // Restoring a window never starts audio by itself.
+            localPlayer.select(localPlayer.index, false);
+            mainWindow.webContents.send('status-change', 'LOCAL');
+        }
+    });
+
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
         broadcastVisibility();
@@ -972,6 +999,11 @@ function updateTrayMenu() {
         { label: 'YTMamp', enabled: false },
         { type: 'separator' },
         { label: 'Show/Hide', click: () => toggleWindow() },
+        { label: 'Open music folder...', click: () => chooseMusicFolder() },
+        { label: 'Playback source', submenu: [
+            { label: 'Local files', type: 'radio', checked: activeSource === 'local', click: () => setPlaybackSource('local') },
+            { label: 'YouTube Music', type: 'radio', checked: activeSource === 'ytm', click: () => setPlaybackSource('ytm') }
+        ] },
         {
             label: 'Copy bridge token',
             click: () => clipboard.writeText(getExpectedAuthToken())
@@ -1045,7 +1077,8 @@ function setupWebSocket() {
         authTimeoutMs: 7000,
         onStatus: (status) => {
             if (status === 'listening') console.log('[WS] Server started on ws://127.0.0.1:18765');
-            appStatus = status === 'listening' ? 'CONNECTED' : status;
+            if (status !== 'listening') ytmStatus = status;
+            if (activeSource === 'ytm') appStatus = ytmStatus;
         },
         onConnection: (ws, req) => {
             const clientIp = req.socket.remoteAddress;
@@ -1070,7 +1103,7 @@ function setupWebSocket() {
                 }
             } else if (message.type === 'cmd' && message.cmd === 'hideWindow') {
                 if (mainWindow) mainWindow.hide();
-            } else if (message.type === 'event' && message.name === 'playingStarted') {
+            } else if (message.type === 'event' && message.name === 'playingStarted' && activeSource === 'ytm') {
                 console.log('[Main] Received playingStarted event');
                 if (settings.autoShowOnPlay && mainWindow && !mainWindow.isVisible()) {
                     console.log('[Main] Auto-showing window due to playback');
@@ -1085,16 +1118,26 @@ function setupWebSocket() {
             } else if (message.type === 'get-settings') {
                 ws.send(JSON.stringify({ type: 'settings', v: 1, settings }));
             } else if (message.type === 'status') {
-                appStatus = message.msg || appStatus;
-                if (mainWindow) mainWindow.webContents.send('status-change', message.msg);
+                ytmStatus = message.msg || ytmStatus;
+                if (/OFFLINE|NEED|WAITING/i.test(ytmStatus)) {
+                    ytmSnapshot.track = null;
+                    ytmSnapshot.state = null;
+                }
+                if (activeSource === 'ytm') {
+                    appStatus = ytmStatus;
+                    if (!ytmSnapshot.track) publishPlayerEvent('track', null, { dedupeMs: 0 });
+                    if (mainWindow) mainWindow.webContents.send('status-change', message.msg);
+                }
             } else if (message.type === 'track') {
-                publishTrack(message);
+                ytmSnapshot.track = message;
+                if (activeSource === 'ytm') publishTrack(message);
             } else if (message.type === 'volStatus') {
-                if (mainWindow) mainWindow.webContents.send('vol-status', message.status);
+                if (activeSource === 'ytm' && mainWindow) mainWindow.webContents.send('vol-status', message.status);
             } else if (message.type === 'state') {
-                publishState(message);
+                ytmSnapshot.state = message;
+                if (activeSource === 'ytm') publishState(message);
             } else if ((message.type === 'wave' || message.type === 'waveFallback')) {
-                if (mainWindow) mainWindow.webContents.send('wave-update', message);
+                if (activeSource === 'ytm' && mainWindow) mainWindow.webContents.send('wave-update', message);
             }
         },
         onError: (error) => console.error('[WS] Error:', error.message)
@@ -1102,17 +1145,129 @@ function setupWebSocket() {
     bridge.start();
 }
 
+function sendPlayerCommand(command) {
+    if (activeSource === 'local') return localPlayer.command(command);
+    return !!(bridge && bridge.relayCommand(command));
+}
+
+function setPlaybackSource(source) {
+    if (!['local', 'ytm'].includes(source) || source === activeSource) return;
+    if (activeSource === 'local') localPlayer.pause();
+    else if (ytmSnapshot.state?.playing && bridge) {
+        bridge.relayCommand({ v: 1, type: 'cmd', cmd: 'pause', id: `source-${Date.now()}` });
+    }
+    activeSource = source;
+    appStatus = source === 'local' ? 'LOCAL' : ytmStatus;
+    if (mainWindow) {
+        mainWindow.webContents.send('source-change', source);
+        mainWindow.webContents.send('status-change', appStatus);
+        mainWindow.webContents.send('wave-update', { type: 'waveFallback', reason: 'Source changed' });
+    }
+    if (source === 'local') localPlayer.publish();
+    else {
+        publishPlayerEvent('track', ytmSnapshot.track ? sanitizeTrackMessage(ytmSnapshot.track) : null, { dedupeMs: 0 });
+        publishState(ytmSnapshot.state || { playing: false });
+    }
+    updateTrayMenu();
+}
+
+function sendFolderNotice(message, busy = false) {
+    if (mainWindow) mainWindow.webContents.send('folder-notice', { message, busy });
+}
+
+async function importMusicFolder(folder, restore = false) {
+    if (folderScan) folderScan.abort();
+    const controller = new AbortController();
+    folderScan = controller;
+    sendFolderNotice('Reading music folder...', true);
+    try {
+        const library = await scanMusicFolder(folder, { signal: controller.signal });
+        controller.signal.throwIfAborted();
+        setPlaybackSource('local');
+        localPlayer.pause();
+        localPlayer.setLibrary(library, restore ? settings.localTrackId : '');
+        settings.localFolder = library.root;
+        saveSettings();
+        const suffix = library.limited ? ' Folder limit reached (5,000 tracks / 50,000 entries).' : '';
+        const skipped = library.skipped ? ` ${library.skipped} inaccessible folders skipped.` : '';
+        sendFolderNotice(`${library.tracks.length} tracks in ${library.name}.${suffix}${skipped}`);
+    } catch (error) {
+        if (!controller.signal.aborted) sendFolderNotice('Cannot read this folder. Reconnect the drive or choose another folder.');
+    } finally {
+        if (folderScan === controller) folderScan = null;
+    }
+}
+
+async function chooseMusicFolder() {
+    if (choosingFolder) return;
+    choosingFolder = true;
+    try {
+        const result = await dialog.showOpenDialog(mainWindow, {
+            title: 'Choose a music folder', properties: ['openDirectory'],
+            ...(typeof settings.localFolder === 'string' && settings.localFolder ? { defaultPath: settings.localFolder } : {})
+        });
+        if (!result.canceled && result.filePaths[0]) await importMusicFolder(result.filePaths[0]);
+    } finally {
+        choosingFolder = false;
+    }
+}
+
+function setupLocalPlayback() {
+    localPlayer.volume = Number.isFinite(settings.localVolume) ? Math.max(0, Math.min(1, settings.localVolume)) : 0.5;
+    protocol.handle('ytmamp-media', createLocalMediaHandler((id) => {
+        const item = localPlayer.library.tracks.find((track) => track.id === id);
+        return item ? { ...item, root: localPlayer.library.root } : null;
+    }));
+    localPlayer.on('audio', (command) => mainWindow?.webContents.send('local-audio-command', command));
+    localPlayer.on('catalog', (catalog) => mainWindow?.webContents.send('local-catalog', catalog));
+    localPlayer.on('selection', (selection) => {
+        mainWindow?.webContents.send('local-selection', selection);
+        if (selection.id && settings.localTrackId !== selection.id) {
+            settings.localTrackId = selection.id;
+            saveSettings();
+        }
+    });
+    localPlayer.on('track', (track) => {
+        if (activeSource === 'local') publishPlayerEvent('track', track, { dedupeMs: 0 });
+    });
+    localPlayer.on('state', (state) => { if (activeSource === 'local') publishState(state); });
+    localPlayer.on('volume', (volume) => { settings.localVolume = volume; saveSettings(); });
+}
+
+function isPlayerSender(event) {
+    return !!mainWindow && event.sender === mainWindow.webContents &&
+        event.senderFrame?.url === pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
+}
+
 function setupIpc() {
     ipcMain.on('send-command', (event, command) => {
-        if (!validateMessage(command)) {
+        if (!isPlayerSender(event) || !validateMessage(command)) {
             console.warn('[Main] Dropping invalid renderer command');
             return;
         }
-        if (bridge && bridge.relayCommand(command)) {
+        if (sendPlayerCommand(command)) {
             console.log(`[Main] [ID:${command.id || 'N/A'}] Relaying CMD to WS: ${command.cmd}`);
         } else {
             console.warn(`[Main] [ID:${command.id || 'N/A'}] Drop: no active WS client`);
         }
+    });
+
+    ipcMain.on('set-source', (event, source) => { if (isPlayerSender(event)) setPlaybackSource(source); });
+    ipcMain.on('open-music-folder', (event) => { if (isPlayerSender(event)) chooseMusicFolder().catch(() => sendFolderNotice('Could not open the folder picker.')); });
+    ipcMain.on('cancel-folder-scan', (event) => {
+        if (isPlayerSender(event) && folderScan) { folderScan.abort(); folderScan = null; sendFolderNotice('Folder scan canceled.'); }
+    });
+    ipcMain.on('select-local-track', (event, id) => {
+        if (!isPlayerSender(event) || activeSource !== 'local' || typeof id !== 'string') return;
+        const index = localPlayer.library.tracks.findIndex((item) => item.id === id);
+        if (index >= 0) localPlayer.select(index);
+    });
+    ipcMain.on('local-audio-report', (event, report) => {
+        if (isPlayerSender(event) && activeSource === 'local') localPlayer.receive(report);
+    });
+    ipcMain.on('set-queue-visible', (event, visible) => {
+        if (!isPlayerSender(event) || typeof visible !== 'boolean') return;
+        mainWindow.setContentSize(360, visible ? 340 : 116);
     });
 
     ipcMain.on('quit-app', () => {
@@ -1130,6 +1285,7 @@ app.whenReady().then(() => {
     applyAutostart();
     setupPlugins();
     setupLastFmScrobbling();
+    setupLocalPlayback();
     createWindow();
     createTray();
     setupIpc();
@@ -1139,8 +1295,7 @@ app.whenReady().then(() => {
             state: playerState.state
         }),
         sendPlayerAction: (command) => {
-            if (!bridge) return { ok: false, error: 'bridge_unavailable' };
-            const sent = bridge.relayCommand({
+            const sent = sendPlayerCommand({
                 v: 1,
                 type: 'cmd',
                 id: `cast-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -1151,6 +1306,7 @@ app.whenReady().then(() => {
     });
     setupIntegrationServer();
     setupWebSocket();
+    if (typeof settings.localFolder === 'string' && settings.localFolder) importMusicFolder(settings.localFolder, true);
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -1164,6 +1320,7 @@ app.on('window-all-closed', function () {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (folderScan) folderScan.abort();
     if (lastfmScrobbler) {
         lastfmScrobbler.stop();
     }

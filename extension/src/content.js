@@ -26,6 +26,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const cmdId = request.id || 'N/A';
         if (CONTROL_COMMANDS.has(request.cmd)) {
             window.YTM_ADAPTER[request.cmd](cmdId);
+        } else if (request.cmd === 'pause') {
+            getMediaEl()?.pause();
         } else if (request.cmd === 'setVolume') {
             const res = setGainVolume(clamp01(request.value));
             console.log(`[YTMamp] setVolume [ID:${request.id}] result: ${res}`);

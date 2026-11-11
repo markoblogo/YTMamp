@@ -49,6 +49,11 @@ jobs:
         working-directory: app
         run: npm run pack
 
+      - name: Local playback desktop smoke
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: app
+        run: xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/smoke-local-playback.js
+
       - name: Upload smoke summary artifact
         if: always()
         uses: actions/upload-artifact@v7
@@ -57,6 +62,7 @@ jobs:
           path: |
             app/ci-smoke-summary.md
             app/ci-smoke-output.log
+            app/local-playback-smoke.png
 
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js
