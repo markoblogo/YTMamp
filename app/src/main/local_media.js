@@ -28,12 +28,12 @@ function createLocalMediaHandler(resolveTrack) {
         let handle;
         try {
             const url = new URL(request.url);
-            if (url.protocol !== 'ytmamp-media:' || url.hostname !== 'audio' ||
+            if (url.protocol !== 'ytmamp-media:' || !['audio', 'art'].includes(url.hostname) ||
                 !/^\/[a-f0-9]{64}$/.test(url.pathname) || url.search || url.username || url.password || url.port) {
                 return new Response(null, { status: 404 });
             }
             if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405 });
-            const item = resolveTrack(url.pathname.slice(1));
+            const item = resolveTrack(url.pathname.slice(1), url.hostname);
             if (!item) return new Response(null, { status: 404 });
             const real = await fsp.realpath(item.filePath);
             if (real !== item.filePath || !isInside(item.root, real)) return new Response(null, { status: 403 });
@@ -46,7 +46,7 @@ function createLocalMediaHandler(resolveTrack) {
             }
             const range = parseRange(request.headers.get('range'), stat.size);
             const headers = {
-                'content-type': AUDIO_TYPES[path.extname(real).toLowerCase()] || 'application/octet-stream',
+                'content-type': url.hostname === 'art' ? item.mimeType : AUDIO_TYPES[path.extname(real).toLowerCase()] || 'application/octet-stream',
                 'accept-ranges': 'bytes', 'cache-control': 'no-store',
                 'access-control-allow-origin': '*'
             };

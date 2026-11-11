@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src ytmamp-media:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: ytmamp-media:; media-src ytmamp-media:; connect-src 'none'; object-src 'none'; base-uri 'none'">
     <title>YTMamp</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,8 +16,8 @@
                 <option value="local">LOCAL</option>
                 <option value="ytm">YT MUSIC</option>
             </select>
-            <button id="open-folder" title="Open music folder" aria-label="Open music folder">FOLDER</button>
-            <button id="queue-toggle" aria-expanded="false" aria-controls="local-queue">LIST</button>
+            <button id="open-folder" title="Add music folders" aria-label="Add music folders">ADD</button>
+            <button id="queue-toggle" aria-expanded="false" aria-controls="local-queue">LIBRARY</button>
             <div id="status-group">
                 <div id="vol-status">VOL: --</div>
                 <div id="status-led" title="Offline"></div>
@@ -27,6 +27,7 @@
 
         <div id="main-content">
             <div id="left-panel">
+                <img id="now-cover" alt="" width="40" height="40" hidden>
                 <canvas id="osc" width="140" height="40"></canvas>
             </div>
             <div id="right-panel">
@@ -62,15 +63,40 @@
         <div id="plugin-panels" aria-live="polite"></div>
         <div id="debug-info"></div>
     </div>
-    <section id="local-queue" aria-label="Local music queue" hidden>
+    <section id="local-queue" aria-label="Music library" hidden>
+        <div id="library-toolbar">
+            <input id="library-search" type="search" aria-label="Search music library" placeholder="Search title, artist, album, genre..." maxlength="200" autocomplete="off">
+            <button id="library-clear">Clear</button>
+            <button id="library-refresh" title="Check added folders for changes">Refresh</button>
+        </div>
+        <div id="library-roots" aria-label="Added music folders"></div>
+        <div id="library-filters">
+            <div role="group" aria-label="Library view">
+                <button id="view-tracks" aria-pressed="true">Tracks</button>
+                <button id="view-albums" aria-pressed="false">Albums</button>
+            </div>
+            <select id="library-folder-filter" aria-label="Music folder filter"><option value="">All folders</option></select>
+            <span id="library-count" role="status"></span>
+        </div>
+        <div id="album-detail" hidden>
+            <button id="album-back">All albums</button>
+            <h2 id="album-title"></h2>
+            <button id="album-play">Play album</button>
+        </div>
         <div id="folder-row">
             <p id="folder-notice" role="status">Choose a folder. Music stays in its original location.</p>
             <button id="cancel-scan" hidden>Cancel</button>
         </div>
-        <ol id="queue-tracks"></ol>
-        <button id="queue-more" hidden>Show more tracks</button>
+        <div id="library-results">
+            <ol id="queue-tracks"></ol>
+            <div id="album-grid" hidden></div>
+            <p id="library-empty" hidden></p>
+            <button id="queue-more" hidden>Show more</button>
+        </div>
     </section>
     <script src="renderer.js"></script>
+    <script src="library_view.js"></script>
+    <script src="library_ui.js"></script>
     <script src="local_audio.js"></script>
 </body>
 

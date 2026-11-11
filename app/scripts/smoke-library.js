@@ -1,0 +1,89 @@
+const { app, dialog, ipcMain } = require('electron');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { taggedWav } = require('./test-audio-fixture');
+
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ytmamp-library-desktop-'));
+const first = path.join(temporary, 'first');
+const second = path.join(temporary, 'second');
+const profile = path.join(temporary, 'profile');
+for (const directory of [first, second, profile]) fs.mkdirSync(directory);
+fs.writeFileSync(path.join(first, 'z-first.wav'), taggedWav({ title: 'First Movement', artist: 'Björk', album: 'Café du matin', track: 1, seconds: 20 }));
+fs.writeFileSync(path.join(first, 'a-second.wav'), taggedWav({ title: 'Second Movement', artist: 'Björk', album: 'Café du matin', track: 2, seconds: 20 }));
+fs.writeFileSync(path.join(second, 'other.wav'), taggedWav({ title: 'Other Song', artist: 'Other Artist', album: 'Night Radio', seconds: 20 }));
+app.setPath('userData', profile);
+app.setLoginItemSettings = () => {};
+app.commandLine.appendSwitch('mute-audio');
+app.disableHardwareAcceleration();
+process.env.BRIDGE_TOKEN = 'isolated-stage2-library-smoke';
+process.env.INTEGRATION_PORT = '24882';
+for (const key of ['INTEGRATION_HOST', 'LASTFM_ENABLED', 'LASTFM_API_KEY', 'LASTFM_API_SECRET', 'LASTFM_SESSION_KEY']) delete process.env[key];
+let picker = 0;
+dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [picker++ === 0 ? first : second] });
+let report;
+let finished = false;
+ipcMain.on('local-audio-report', (_event, value) => { report = value; });
+const deadline = setTimeout(() => finish(new Error('Library desktop smoke timed out')), 45000);
+function finish(error) {
+    if (finished) return;
+    finished = true; clearTimeout(deadline);
+    console.log(error ? 'LIBRARY_DESKTOP_SMOKE FAIL: ' + (error.stack || error) : 'LIBRARY_DESKTOP_SMOKE PASS: multiple folders, tags, images, search, albums, queue, offline/reconnect, removal and original files');
+    fs.rmSync(temporary, { recursive: true, force: true });
+    app.exit(error ? 1 : 0);
+}
+async function waitFor(predicate, label) {
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+        if (await predicate()) return;
+        await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    throw new Error('Timed out: ' + label);
+}
+async function run(window) {
+    const evaluate = (code) => window.webContents.executeJavaScript(code, true);
+    const idle = () => evaluate('!document.getElementById("open-folder").disabled');
+    await waitFor(idle, 'initial cache load');
+    await evaluate('document.getElementById("open-folder").click()');
+    await waitFor(async () => await idle() && await evaluate('document.querySelectorAll("#queue-tracks button").length === 2'), 'first folder tags');
+    assert.equal(await evaluate('document.querySelector(".track-title").textContent'), 'First Movement');
+    await evaluate('document.querySelector("#queue-tracks button").click()');
+    await waitFor(() => report?.playing && report.positionSec > 0.1, 'tagged WAV playback');
+    const revision = report.revision;
+    const firstId = report.id;
+    await evaluate('document.getElementById("open-folder").click()');
+    await waitFor(async () => await idle() && await evaluate('document.querySelectorAll("#queue-tracks button").length === 3'), 'second folder');
+    assert.equal(report.id, firstId); assert.equal(report.revision, revision);
+    await evaluate('const search=document.getElementById("library-search"); search.value="bjork cafe"; search.dispatchEvent(new Event("input"));');
+    await waitFor(() => evaluate('document.querySelectorAll("#queue-tracks button").length === 2'), 'accent-insensitive search');
+    await evaluate('document.getElementById("library-clear").click(); document.getElementById("view-albums").click();');
+    await waitFor(() => evaluate('document.querySelectorAll(".album-card").length === 2'), 'album grid');
+    await waitFor(() => evaluate('[...document.querySelectorAll("#album-grid img")].every(image => image.complete && image.naturalWidth > 0)'), 'artwork decoding and CSP');
+    await evaluate('[...document.querySelectorAll(".album-card")].find(button => button.textContent.includes("Café du matin")).click(); document.getElementById("album-play").click();');
+    await waitFor(() => report?.id === firstId && report?.playing, 'play album');
+    await evaluate('window.electronAPI.sendCommand({v:1,type:"cmd",cmd:"seek",valueSec:19.85})');
+    await waitFor(async () => report?.playing && report.id !== firstId && await evaluate('document.getElementById("title").textContent === "Second Movement"'), 'album next track');
+    await evaluate('window.electronAPI.sendCommand({v:1,type:"cmd",cmd:"seek",valueSec:19.85})');
+    await waitFor(() => report && !report.playing && report.positionSec > 19.8, 'end album');
+    assert.equal(await evaluate('document.getElementById("title").textContent'), 'Second Movement');
+    fs.renameSync(second, second + '-offline');
+    await evaluate('document.getElementById("library-refresh").click()');
+    await waitFor(async () => await idle() && await evaluate('document.querySelectorAll(".library-root.offline").length === 1'), 'offline root');
+    fs.renameSync(second + '-offline', second);
+    await evaluate('document.getElementById("library-refresh").click()');
+    await waitFor(async () => await idle() && await evaluate('document.querySelectorAll(".library-root.offline").length === 0'), 'reconnected root');
+    await evaluate('document.querySelectorAll("#library-roots button")[1].click()');
+    await waitFor(async () => await idle() && await evaluate('document.querySelectorAll(".library-root").length === 1'), 'remove folder');
+    assert.ok(fs.existsSync(path.join(second, 'other.wav')));
+    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'local-library-v1.json'), 'utf8'));
+    assert.equal(saved.roots.length, 1); assert.equal(Object.keys(saved.entries).length, 2);
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 700'), true);
+    const screenshot = await window.webContents.capturePage();
+    fs.writeFileSync(path.join(__dirname, '../library-smoke.png'), screenshot.toPNG());
+    finish();
+}
+app.on('browser-window-created', (_event, window) => {
+    window.webContents.once('did-finish-load', () => setTimeout(() => run(window).catch(finish), 50));
+});
+require('../src/main/main');

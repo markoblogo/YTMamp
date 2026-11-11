@@ -472,3 +472,38 @@ button:active {
         opacity: 1;
     }
 }
+
+/* Library view keeps the original mini-player above a separate collection panel. */
+#volume-container, #volume-slider { min-width: 0; }
+#left-panel { position: relative; flex-direction: row; gap: 4px; align-items: start; }
+#now-cover { object-fit: cover; border: 1px solid #3e5140; flex: 0 0 40px; }
+#left-panel:has(#now-cover:not([hidden])) #osc { width: 94px; }
+#local-queue { height: calc(100vh - 116px); display: flex; flex-direction: column; gap: 8px; padding: 10px; overflow: hidden; }
+#library-toolbar, #library-filters { display: flex; align-items: center; gap: 6px; }
+#library-search { flex: 1; min-width: 80px; background: #080c09; color: #d9efdc; border: 1px solid #47604b; padding: 7px; font: inherit; user-select: text; }
+#library-toolbar button, #library-filters button, #album-detail button { padding: 5px 7px; }
+#library-folder-filter { max-width: 220px; min-width: 80px; background: #171d18; color: #c5dec9; border: 1px solid #4a584d; padding: 4px; font: inherit; }
+#library-count { margin-left: auto; color: #a4b4a7; font-size: 10px; }
+#library-roots { display: flex; flex-wrap: wrap; gap: 5px; max-height: 76px; overflow: auto; }
+.library-root { display: flex; align-items: center; gap: 5px; border: 1px solid #344237; background: #172019; padding: 3px 5px; color: #b3c3b7; }
+.library-root.offline { border-color: #84633b; color: #d4b386; }
+.library-root button { font-size: 8px; min-width: 20px; padding: 1px 3px; }
+#library-filters button[aria-pressed="true"] { border-color: #7aba83; color: #afffba; }
+#album-detail { display: flex; align-items: center; gap: 8px; }
+#album-title { flex: 1; min-width: 0; font-size: 12px; margin: 0; color: #c2ecc9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#folder-notice { margin: 0; font-size: 10px; min-height: 12px; }
+#library-results { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
+#queue-tracks { padding-left: 29px; }
+#queue-tracks button { display: flex; align-items: center; gap: 8px; padding: 6px; min-height: 40px; text-transform: none; }
+.track-copy { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 3px; }
+.track-title, .track-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track-detail { color: #819a87; font-size: 10px; }
+.track-cover { width: 32px; height: 32px; object-fit: cover; flex: 0 0 32px; }
+#album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 8px; }
+.album-card { display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 156px; padding: 9px; text-transform: none; font: inherit; }
+.album-card img, .album-placeholder { width: 84px; height: 84px; object-fit: cover; background: #19251c; border: 1px solid #344b39; }
+.album-placeholder { display: grid; place-items: center; color: #69846f; font-size: 12px; }
+.album-card span { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.album-artist, .album-count { font-size: 10px; color: #8ca892; }
+#library-empty { color: #b8c6bc; text-align: center; margin: 26px 12px; line-height: 1.6; }
+#queue-more { padding: 7px; }

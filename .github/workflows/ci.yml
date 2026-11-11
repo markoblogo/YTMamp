@@ -29,13 +29,6 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
-      - name: Resolve pinned metadata reader
-        if: matrix.os == 'ubuntu-latest'
-        working-directory: app
-        run: |
-          npm install --package-lock-only --ignore-scripts --save-exact music-metadata@12.4.0
-          node -e "for (const f of ['package.json', 'package-lock.json']) console.log('YTMAMP_STAGE2_EXPORT:' + f + ':' + require('fs').readFileSync(f).toString('base64'))"
-
       - name: Install deps
         working-directory: app
         run: npm ci
@@ -70,28 +63,40 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           codesign --verify --deep --strict --verbose=2 app/dist/mac-arm64/YTMamp.app
-          ditto -x -k app/dist/YTMamp-0.5.0-mac.zip "$RUNNER_TEMP/ytmamp-preview-verify"
+          ditto -x -k app/dist/YTMamp-0.6.0-mac.zip "$RUNNER_TEMP/ytmamp-preview-verify"
           codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/ytmamp-preview-verify/YTMamp.app"
+
+      - name: Test metadata in signed Apple Silicon package
+        if: matrix.os == 'macos-latest'
+        working-directory: app
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+        run: ./dist/mac-arm64/YTMamp.app/Contents/MacOS/YTMamp scripts/test-packaged-metadata.js "$PWD/dist/mac-arm64/YTMamp.app"
 
       - name: Bundle matching browser companion
         if: matrix.os == 'macos-latest'
-        run: zip -r app/dist/YTMamp-0.5.0-extension.zip extension
+        run: zip -r app/dist/YTMamp-0.6.0-extension.zip extension
 
       - name: Upload Apple Silicon preview
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v7
         with:
-          name: YTMamp-stage1-macos-arm64
+          name: YTMamp-stage2-macos-arm64
           path: |
-            app/dist/YTMamp-0.5.0-mac.dmg
-            app/dist/YTMamp-0.5.0-mac.zip
-            app/dist/YTMamp-0.5.0-extension.zip
+            app/dist/YTMamp-0.6.0-mac.dmg
+            app/dist/YTMamp-0.6.0-mac.zip
+            app/dist/YTMamp-0.6.0-extension.zip
           if-no-files-found: error
 
       - name: Local playback desktop smoke
         if: matrix.os == 'ubuntu-latest'
         working-directory: app
         run: xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/smoke-local-playback.js
+
+      - name: Music library desktop smoke
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: app
+        run: xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/smoke-library.js
 
       - name: Upload smoke summary artifact
         if: always()
@@ -102,6 +107,7 @@ jobs:
             app/ci-smoke-summary.md
             app/ci-smoke-output.log
             app/local-playback-smoke.png
+            app/library-smoke.png
 
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js

@@ -9,23 +9,8 @@
     let playbackError = '';
     let context;
     let analyser;
-    let catalog = [];
-    let selection = '';
-    let rendered = 0;
-    let queueVisible = false;
     const samples = new Uint8Array(128).fill(128);
-    const queue = document.getElementById('local-queue');
-    const list = document.getElementById('queue-tracks');
-    const more = document.getElementById('queue-more');
     const notice = document.getElementById('folder-notice');
-    const cancel = document.getElementById('cancel-scan');
-
-    function showQueue(visible) {
-        queueVisible = visible;
-        queue.hidden = !visible;
-        document.getElementById('queue-toggle').setAttribute('aria-expanded', String(visible));
-        api.setQueueVisible(visible);
-    }
 
     function report(extra = {}) {
         if (source !== 'local' || !id) return;
@@ -72,61 +57,24 @@
         return samples;
     };
 
-    function appendTracks() {
-        const fragment = document.createDocumentFragment();
-        const end = Math.min(catalog.length, rendered + 200);
-        for (; rendered < end; rendered++) {
-            const track = catalog[rendered];
-            const item = document.createElement('li');
-            const button = document.createElement('button');
-            button.textContent = track.title;
-            button.title = track.relativePath;
-            button.dataset.id = track.id;
-            button.disabled = source !== 'local';
-            button.setAttribute('aria-current', String(track.id === selection));
-            button.addEventListener('click', () => api.selectLocalTrack(track.id));
-            item.appendChild(button);
-            fragment.appendChild(item);
-        }
-        list.appendChild(fragment);
-        more.hidden = rendered >= catalog.length;
-    }
-
-    document.getElementById('source-select').addEventListener('change', (event) => api.setSource(event.target.value));
-    document.getElementById('open-folder').addEventListener('click', () => { showQueue(true); api.openMusicFolder(); });
-    document.getElementById('queue-toggle').addEventListener('click', () => showQueue(!queueVisible));
-    more.addEventListener('click', appendTracks);
-    cancel.addEventListener('click', () => api.cancelFolderScan());
-
     api.onSourceChange((value) => {
         source = value;
-        document.getElementById('source-select').value = source;
         document.getElementById('like-btn').disabled = source === 'local';
         if (source !== 'local') {
             audio.pause();
             if (context) context.suspend().catch(() => {});
         }
-        for (const button of list.querySelectorAll('button')) button.disabled = source !== 'local';
     });
-    api.onLocalCatalog((value) => {
-        catalog = value.tracks;
-        rendered = 0;
-        list.replaceChildren();
-        appendTracks();
-        if (value.name) notice.textContent = `${catalog.length} tracks in ${value.name}`;
+    api.onTrackUpdate((track) => {
+        const image = document.getElementById('now-cover');
+        const cover = track?.source === 'local' && /^ytmamp-media:\/\/art\/[a-f0-9]{64}$/.test(track.cover || '') ? track.cover : '';
+        image.hidden = !cover;
+        if (cover) {
+            image.src = cover;
+            image.alt = (track.album || 'Album') + ' cover';
+        } else image.removeAttribute('src');
     });
-    api.onLocalSelection((value) => {
-        selection = value.id;
-        for (const button of list.querySelectorAll('button')) button.setAttribute('aria-current', String(button.dataset.id === selection));
-        document.getElementById('shuffle-btn').setAttribute('aria-pressed', String(value.shuffle));
-        document.getElementById('repeat-btn').setAttribute('aria-pressed', String(value.repeat));
-    });
-    api.onFolderNotice(({ message, busy }) => {
-        notice.textContent = message;
-        cancel.hidden = !busy;
-        document.getElementById('open-folder').disabled = busy;
-        if (!catalog.length || busy) document.getElementById('artist').textContent = message;
-    });
+    document.getElementById('now-cover').addEventListener('error', (event) => { event.target.hidden = true; });
     api.onLocalAudioCommand((command) => {
         if (command.action === 'load' || command.action === 'unload') {
             playbackError = '';

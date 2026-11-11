@@ -1,6 +1,6 @@
 const { app, BrowserWindow, clipboard, ipcMain, Tray, Menu, nativeImage, screen, dialog, protocol } = require('electron');
 const { pathToFileURL } = require('node:url');
-const { scanMusicFolder } = require('./local_library');
+const { LocalCollection } = require('./local_collection');
 const { createLocalMediaHandler } = require('./local_media');
 const { LocalPlayer } = require('./local_player');
 
@@ -42,6 +42,8 @@ let activeSource = 'local';
 let ytmStatus = 'Need YTM Tab';
 const ytmSnapshot = { track: null, state: null };
 let folderScan;
+let collection;
+let collectionReady;
 let choosingFolder = false;
 const localPlayer = new LocalPlayer();
 const pluginRuntimeStatusQueue = [];
@@ -951,6 +953,7 @@ function createWindow() {
     mainWindow.webContents.on('did-finish-load', () => {
         mainWindow.webContents.send('source-change', activeSource);
         mainWindow.webContents.send('local-catalog', localPlayer.catalog());
+        if (folderScan) sendFolderNotice('Reading music folders and tags...', true);
         if (activeSource === 'local') {
             // Restoring a window never starts audio by itself.
             localPlayer.select(localPlayer.index, false);
@@ -999,7 +1002,8 @@ function updateTrayMenu() {
         { label: 'YTMamp', enabled: false },
         { type: 'separator' },
         { label: 'Show/Hide', click: () => toggleWindow() },
-        { label: 'Open music folder...', click: () => chooseMusicFolder() },
+        { label: 'Add music folders...', click: () => chooseMusicFolder() },
+        { label: 'Refresh music library', click: () => changeCollection() },
         { label: 'Playback source', submenu: [
             { label: 'Local files', type: 'radio', checked: activeSource === 'local', click: () => setPlaybackSource('local') },
             { label: 'YouTube Music', type: 'radio', checked: activeSource === 'ytm', click: () => setPlaybackSource('ytm') }
@@ -1175,48 +1179,71 @@ function sendFolderNotice(message, busy = false) {
     if (mainWindow) mainWindow.webContents.send('folder-notice', { message, busy });
 }
 
-async function importMusicFolder(folder, restore = false) {
-    if (folderScan) folderScan.abort();
+async function ensureCollection() {
+    collectionReady ||= collection.load(typeof settings.localFolder === 'string' ? settings.localFolder : '');
+    await collectionReady;
+}
+
+async function changeCollection(folders = [], { restore = false, removeId = '' } = {}) {
+    if (folderScan) return;
     const controller = new AbortController();
     folderScan = controller;
-    sendFolderNotice('Reading music folder...', true);
+    sendFolderNotice('Reading music folders and tags...', true);
     try {
-        const library = await scanMusicFolder(folder, { signal: controller.signal });
+        await ensureCollection();
+        const library = await collection.update({ folders, removeId, signal: controller.signal,
+            onProgress: ({ processed, folder }) => sendFolderNotice('Reading tags: ' + processed + ' tracks, ' + folder, true) });
         controller.signal.throwIfAborted();
-        if (!restore) setPlaybackSource('local');
-        localPlayer.pause();
-        localPlayer.setLibrary(library, restore ? settings.localTrackId : '');
-        settings.localFolder = library.root;
+        if (folders.length && !restore) setPlaybackSource('local');
+        localPlayer.setLibrary(library, settings.localTrackId, { preservePlayback: true });
+        settings.localFolder = collection.roots[0]?.path || '';
+        settings.localTrackId = localPlayer.current?.id || '';
         saveSettings();
-        const suffix = library.limited ? ' Folder limit reached (5,000 tracks / 50,000 entries).' : '';
-        const skipped = library.skipped ? ` ${library.skipped} inaccessible folders skipped.` : '';
-        sendFolderNotice(`${library.tracks.length} tracks in ${library.name}.${suffix}${skipped}`);
+        const offline = library.roots.filter((root) => root.status === 'offline').length;
+        let message = library.tracks.length + ' tracks in ' + library.roots.length + ' folders.';
+        if (offline) message += ' ' + offline + ' folders offline. Reconnect and refresh.';
+        if (library.limited) message += ' Library limit reached.';
+        if (library.skipped) message += ' ' + library.skipped + ' inaccessible entries skipped.';
+        sendFolderNotice(message);
     } catch (error) {
-        if (!controller.signal.aborted) sendFolderNotice('Cannot read this folder. Reconnect the drive or choose another folder.');
+        if (controller.signal.aborted) sendFolderNotice('Library update canceled.');
+        else sendFolderNotice(error.code ? 'Cannot read the folder. Reconnect the drive and try again.' : error.message);
     } finally {
         if (folderScan === controller) folderScan = null;
     }
 }
 
+async function restoreLibrary() {
+    try {
+        await ensureCollection();
+        localPlayer.setLibrary(collection.snapshot(), settings.localTrackId);
+        await changeCollection([], { restore: true });
+    } catch {
+        sendFolderNotice('Cannot restore the library. Add your music folders again.');
+    }
+}
+
 async function chooseMusicFolder() {
-    if (choosingFolder) return;
+    if (choosingFolder || folderScan) return;
     choosingFolder = true;
     try {
         const result = await dialog.showOpenDialog(mainWindow, {
-            title: 'Choose a music folder', properties: ['openDirectory'],
+            title: 'Add music folders', properties: ['openDirectory', 'multiSelections'],
             ...(typeof settings.localFolder === 'string' && settings.localFolder ? { defaultPath: settings.localFolder } : {})
         });
-        if (!result.canceled && result.filePaths[0]) await importMusicFolder(result.filePaths[0]);
+        if (!result.canceled && result.filePaths.length) await changeCollection(result.filePaths);
     } finally {
         choosingFolder = false;
     }
 }
 
 function setupLocalPlayback() {
+    collection = new LocalCollection({ directory: app.getPath('userData') });
     localPlayer.volume = Number.isFinite(settings.localVolume) ? Math.max(0, Math.min(1, settings.localVolume)) : 0.5;
-    protocol.handle('ytmamp-media', createLocalMediaHandler((id) => {
-        const item = localPlayer.library.tracks.find((track) => track.id === id);
-        return item ? { ...item, root: localPlayer.library.root } : null;
+    protocol.handle('ytmamp-media', createLocalMediaHandler((id, kind) => {
+        if (kind === 'art') return collection.artwork(id);
+        const item = localPlayer.library.tracks.find((track) => track.id === id && track.available !== false);
+        return item ? { ...item, root: item.root || localPlayer.library.root } : null;
     }));
     localPlayer.on('audio', (command) => mainWindow?.webContents.send('local-audio-command', command));
     localPlayer.on('catalog', (catalog) => mainWindow?.webContents.send('local-catalog', catalog));
@@ -1255,19 +1282,31 @@ function setupIpc() {
     ipcMain.on('set-source', (event, source) => { if (isPlayerSender(event)) setPlaybackSource(source); });
     ipcMain.on('open-music-folder', (event) => { if (isPlayerSender(event)) chooseMusicFolder().catch(() => sendFolderNotice('Could not open the folder picker.')); });
     ipcMain.on('cancel-folder-scan', (event) => {
-        if (isPlayerSender(event) && folderScan) { folderScan.abort(); folderScan = null; sendFolderNotice('Folder scan canceled.'); }
+        if (isPlayerSender(event) && folderScan) folderScan.abort();
     });
-    ipcMain.on('select-local-track', (event, id) => {
+    ipcMain.on('refresh-library', (event) => { if (isPlayerSender(event)) changeCollection(); });
+    ipcMain.on('remove-library-folder', (event, id) => {
+        if (isPlayerSender(event) && typeof id === 'string' && /^[a-f0-9]{64}$/.test(id)) changeCollection([], { removeId: id });
+    });
+    ipcMain.on('play-local-album', (event, id) => {
+        if (isPlayerSender(event) && activeSource === 'local' && typeof id === 'string' && /^[a-f0-9]{64}$/.test(id)) localPlayer.playAlbum(id);
+    });
+    ipcMain.on('select-local-track', (event, id, albumId) => {
         if (!isPlayerSender(event) || activeSource !== 'local' || typeof id !== 'string') return;
-        const index = localPlayer.library.tracks.findIndex((item) => item.id === id);
-        if (index >= 0) localPlayer.select(index);
+        localPlayer.playTrack(id, typeof albumId === 'string' ? albumId : '');
     });
     ipcMain.on('local-audio-report', (event, report) => {
         if (isPlayerSender(event) && activeSource === 'local') localPlayer.receive(report);
     });
     ipcMain.on('set-queue-visible', (event, visible) => {
         if (!isPlayerSender(event) || typeof visible !== 'boolean') return;
-        mainWindow.setContentSize(360, visible ? 340 : 116);
+        mainWindow.setContentSize(visible ? 700 : 360, visible ? 560 : 116);
+        const bounds = mainWindow.getBounds();
+        const area = screen.getDisplayMatching(bounds).workArea;
+        mainWindow.setPosition(
+            Math.max(area.x, Math.min(bounds.x, area.x + area.width - bounds.width)),
+            Math.max(area.y, Math.min(bounds.y, area.y + area.height - bounds.height))
+        );
     });
 
     ipcMain.on('quit-app', () => {
@@ -1306,7 +1345,7 @@ app.whenReady().then(() => {
     });
     setupIntegrationServer();
     setupWebSocket();
-    if (typeof settings.localFolder === 'string' && settings.localFolder) importMusicFolder(settings.localFolder, true);
+    restoreLibrary();
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -1321,6 +1360,7 @@ app.on('window-all-closed', function () {
 app.on('before-quit', () => {
     isQuitting = true;
     if (folderScan) folderScan.abort();
+    collection?.close();
     if (lastfmScrobbler) {
         lastfmScrobbler.stop();
     }

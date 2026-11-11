@@ -10,3 +10,4 @@ yarn-error.log*
 .vscode/
 .env
 app/local-playback-smoke.png
+app/library-smoke.png
