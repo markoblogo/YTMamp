@@ -35,6 +35,25 @@ test('catalog merges duplicate streams, prefers supported direct audio and tempo
     library.retryStation(id); assert.equal(library.failed.has(id), false);
     library.markFailed(id); library.markSuccessful(id); assert.equal(library.failed.has(id), false);
 });
+test('decoded stream checks expire, survive restart and are invalidated when an address changes', (t) => {
+    const { directory, library } = fixture(t);
+    const station = stationFrom(raw('Checked radio', 'https://example.org/first', { stationuuid: '00000000-0000-0000-0000-000000000001' }));
+    library.stations.set(station.id, station); library.markSuccessful(station.id);
+    assert.ok(library.public(station).checkedAt > 0);
+    const restored = new RadioLibrary({ directory }); assert.ok(restored.public(restored.stations.get(station.id)).checkedAt > 0);
+    library.stations.set(station.id, { ...station, url: 'https://example.org/changed' });
+    assert.equal(library.public(library.stations.get(station.id)).checkedAt, 0);
+    library.markSuccessful(station.id); library.markFailed(station.id);
+    assert.equal(library.public(library.stations.get(station.id)).checkedAt, 0);
+    assert.equal(library.favorites.size, 0);
+});
+test('favorite pages retain saved stations and allow browsing beyond the first checked batch', async (t) => {
+    const { library } = fixture(t);
+    for (let i = 0; i < 30; i++) { const station = stationFrom(raw('Station ' + i, 'https://example.org/' + i)); library.stations.set(station.id, station); library.favorites.add(station.id); }
+    const first = await library.search({ view: 'favorites' }); const next = await library.search({ view: 'favorites', offset: 24 });
+    assert.equal(first.stations.length, 24); assert.equal(first.more, true); assert.equal(next.stations.length, 6); assert.equal(next.more, false);
+    library.markFailed(first.stations[0].id); assert.equal(library.favorites.size, 30);
+});
 test('FM parsing requires an explicit band/unit and never invents frequencies', () => {
     assert.equal(frequency('Radio Jazz 92.1 FM'), 92.1); assert.equal(frequency('FM 101,3 Jazz'), 101.3);
     assert.equal(frequency('Jazz 105.2 MHz'), 105.2);

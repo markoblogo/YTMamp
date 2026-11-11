@@ -28,7 +28,7 @@ function checkedUrl(value) {
     if (net.isIP(ip) && !publicAddress(ip)) throw new Error('Private network addresses are not supported.');
     return url;
 }
-async function openRemote(value, { signal, userAgent = 'YTMamp/0.7.1', redirects = 5 } = {}) {
+async function openRemote(value, { signal, userAgent = 'YTMamp/0.7.2', redirects = 5 } = {}) {
     const url = checkedUrl(value);
     signal?.throwIfAborted();
     const host = url.hostname.replace(/^\[|\]$/g, '');
@@ -98,7 +98,7 @@ function createRadioMediaHandler(resolveStation) {
     return async (request) => {
         try {
             const url = new URL(request.url);
-            if (!['radio', 'radio-art'].includes(url.hostname) || !/^\/[a-f0-9]{64}$/.test(url.pathname) ||
+            if (!['radio', 'radio-art', 'radio-check'].includes(url.hostname) || !/^\/[a-f0-9]{64}$/.test(url.pathname) ||
                 url.search || url.port || url.username || url.password || request.method !== 'GET') return new Response(null, { status: 404 });
             const station = resolveStation(url.pathname.slice(1));
             if (!station) return new Response(null, { status: 404 });
@@ -120,8 +120,18 @@ function createRadioMediaHandler(resolveStation) {
             request.signal.addEventListener('abort', abort, { once: true });
             response.once('close', () => request.signal.removeEventListener('abort', abort));
             if (request.signal.aborted) response.destroy();
-            return new Response(Readable.toWeb(response), { headers: { ...headers, 'content-type': type } });
+            return new Response(Readable.toWeb(url.hostname === 'radio-check' ? boundedPreview(response) : response), { headers: { ...headers, 'content-type': type } });
         } catch { return new Response(null, { status: 502 }); }
     };
 }
-module.exports = { publicAddress, checkedUrl, openRemote, getJson, RadioBrowser, createRadioMediaHandler };
+function boundedPreview(response) {
+    return Readable.from((async function* () {
+        let remaining = 128 * 1024;
+        for await (const chunk of response) {
+            const part = chunk.subarray(0, remaining); remaining -= part.length;
+            yield part;
+            if (!remaining) break;
+        }
+    })());
+}
+module.exports = { publicAddress, checkedUrl, openRemote, getJson, RadioBrowser, createRadioMediaHandler, boundedPreview };

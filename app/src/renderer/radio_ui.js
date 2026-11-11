@@ -1,8 +1,9 @@
 (() => {
     const api = window.electronAPI; const $ = (id) => document.getElementById(id);
-    let source = 'local'; let view = 'all'; let selected = ''; let local = []; let saved = []; let rows = []; let location; let offset = 0; let serial = 0; let busy = false; let pendingFrequency; let locating = false; let loaded = false;
+    let source = 'local'; let view = 'all'; let selected = ''; let local = []; let rows = []; let location; let offset = 0; let serial = 0; let busy = false; let pendingFrequency; let locating = false; let loaded = false;
     const notice = (message) => { $('radio-notice').textContent = message; };
     const call = async (action, data) => { const result = await api.radio(action, data); if (result?.error) throw new Error(result.error); return result; };
+    const verifier = new window.RadioStationVerifier({ report: (id, ok) => call('stream-check', { id, ok }) });
     function updateDial() {
         const item = local.find((s) => s.id === selected);
         $('radio-dial').disabled = !local.length;
@@ -42,28 +43,36 @@
         $('radio-grid').replaceChildren(fragment);
         for (const kind of ['all', 'favorites', 'local']) $('radio-' + kind).setAttribute('aria-pressed', String(view === kind));
     }
-    function query() { return { name: $('radio-search').value, genre: $('radio-genre').value, language: $('radio-language').value, sort: $('radio-sort').value, order: ({ genre: 'tags', region: 'state' })[$('radio-sort').value] || $('radio-sort').value, view, offset }; }
+    function query() { return { name: $('radio-search').value, genre: $('radio-genre').value, language: $('radio-language').value, sort: $('radio-sort').value, order: ({ popular: 'clickcount', genre: 'tags', region: 'state' })[$('radio-sort').value] || $('radio-sort').value, view, offset }; }
     async function search(more = false) {
         const ticket = ++serial;
+        verifier.cancel();
         if (!more) offset = 0;
         busy = true; $('radio-more').disabled = true; notice('Searching stations…');
         try {
-            if (view === 'local') { rows = local; $('radio-more').hidden = true; render(); notice(local.length ? local.length + ' local stations, ordered by supplied FM frequency.' : locating ? 'Finding local stations from your device location…' : 'No supplied FM frequencies nearby. All stations is available without local FM data.'); return; }
-            const result = await call('search', query());
+            if (view === 'local' && !local.length) { rows = []; $('radio-more').hidden = true; render(); notice(locating ? 'Finding local stations from your device location…' : 'No supplied FM frequencies nearby. All stations is available without local FM data.'); return; }
+            const result = view === 'local' ? { stations: local.slice(offset, offset + 24), more: local.length > offset + 24 } : await call('search', query());
             if (ticket !== serial) return;
-            rows = more ? [...new Map([...rows, ...result.stations].map((s) => [s.id, s])).values()] : result.stations;
+            if (!more) rows = [];
             $('radio-more').hidden = !result.more || offset >= 1000;
             loaded = true;
-            render(); notice(result.warning || rows.length + ' stations' + (result.cached ? ' / saved results' : ' / Radio Browser') + (rows.length ? '' : '. Try a broader search.'));
+            render(); notice('Checking station streams…');
+            const checks = await verifier.verify(result.stations.slice(0, 24), (station) => {
+                if (ticket !== serial) return;
+                rows = [...new Map([...rows, station].map((s) => [s.id, s])).values()]; render();
+                notice(rows.length + ' stations ready / checking more…');
+            });
+            if (ticket !== serial) return;
+            notice(result.warning || rows.length + ' stations / streams checked' + (checks.hidden ? ' / ' + checks.hidden + ' unavailable hidden' : '') + (checks.canceled ? ' / check your connection and retry' : '') + (!rows.length ? '. Try MORE STATIONS or a broader search.' : ''));
         } catch (error) { if (ticket === serial) notice(error.message); }
         finally { if (ticket === serial) { busy = false; $('radio-more').disabled = false; } }
     }
-    function snapshot(data) { local = data.local || []; saved = data.stations || []; location = data.location; $('radio-location-label').textContent = location?.label || 'Location not set'; updateDial(); if (view === 'local') { rows = local; render(); } }
+    function snapshot(data) { local = data.local || []; location = data.location; $('radio-location-label').textContent = location?.label || 'Location not set'; updateDial(); }
     async function refreshSnapshot() { snapshot(await call('snapshot')); }
     $('radio-search-form').addEventListener('submit', (event) => { event.preventDefault(); search(); });
     $('radio-sort').addEventListener('change', () => search());
     for (const id of ['radio-genre', 'radio-language']) $(id).addEventListener('change', () => search());
-    $('radio-more').addEventListener('click', () => { if (!busy) { offset += 200; search(true); } });
+    $('radio-more').addEventListener('click', () => { if (!busy) { offset += 24; search(true); } });
     for (const kind of ['all', 'favorites', 'local']) $('radio-' + kind).addEventListener('click', () => { view = kind; search(); });
     $('radio-collapse').addEventListener('click', () => window.setLibraryVisible(false));
     $('radio-retry').addEventListener('click', () => call('play', { id: selected, retry: true }).catch((e) => notice(e.message)));
@@ -122,14 +131,14 @@
         $('radio-tuner').hidden = value !== 'radio'; $('progress-container').hidden = value === 'radio'; $('timer-container').hidden = value === 'radio';
         $('shuffle-btn').hidden = value === 'radio'; $('repeat-btn').hidden = value === 'radio'; $('radio-record-controls').hidden = value !== 'radio';
         $('prev-btn').title = value === 'radio' ? 'Previous local FM station' : 'Previous track'; $('next-btn').title = value === 'radio' ? 'Next local FM station' : 'Next track';
-        if (value === 'radio') { refreshSnapshot().then(() => { if (!rows.length) { rows = saved; render(); } if (!loaded) search(); locateDevice(); }).catch((e) => notice(e.message)); updateDial(); }
-        else { $('prev-btn').disabled = false; $('next-btn').disabled = false; }
+        if (value === 'radio') { refreshSnapshot().then(() => { if (!loaded || busy) search(); locateDevice(); }).catch((e) => notice(e.message)); updateDial(); }
+        else { ++serial; verifier.cancel(); if (busy) loaded = false; busy = false; $('prev-btn').disabled = false; $('next-btn').disabled = false; }
     });
     api.onStateUpdate((state) => {
         if (source !== 'radio') return;
         if (state.playing) notice('LIVE / ' + $('title').textContent + (state.connecting ? ' / buffering…' : ''));
         else if (state.connecting) notice('Connecting to ' + $('title').textContent + '…');
-        else if (state.error) notice(state.error);
+        else if (state.error) { rows = rows.filter((station) => station.id !== selected); render(); notice(state.error); }
         else if (selected) notice('Radio paused. Press Play to reconnect to the live stream.');
     });
 })();

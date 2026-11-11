@@ -1362,7 +1362,7 @@ function setupLocalPlayback() {
         return item ? { ...item, root: item.root || localPlayer.library.root } : null;
     });
     const radioMedia = createRadioMediaHandler((id) => radioLibrary.stations.get(id));
-    protocol.handle('ytmamp-media', (request) => /^ytmamp-media:\/\/radio(?:-art)?\//.test(request.url) ? radioMedia(request) : localMedia(request));
+    protocol.handle('ytmamp-media', (request) => /^ytmamp-media:\/\/radio(?:-art|-check)?\//.test(request.url) ? radioMedia(request) : localMedia(request));
     localPlayer.on('audio', (command) => mainWindow?.webContents.send('local-audio-command', command));
     localPlayer.on('catalog', (catalog) => mainWindow?.webContents.send('local-catalog', catalog));
     localPlayer.on('selection', (selection) => {
@@ -1401,6 +1401,11 @@ async function radioAction(event, action, data = {}) {
     try {
         if (action === 'snapshot') return radioLibrary.snapshot();
         if (action === 'search') return await radioLibrary.search(data);
+        if (action === 'stream-check') {
+            if (activeSource !== 'radio' || typeof data.ok !== 'boolean' || !radioLibrary.stations.has(data.id)) return { error: 'Invalid station check.' };
+            if (data.ok) radioLibrary.markSuccessful(data.id); else radioLibrary.markFailed(data.id);
+            return { ok: true, alternate: data.ok ? null : radioLibrary.alternatives(data.id).map((station) => radioLibrary.public(station))[0] || null };
+        }
         if (action === 'device-location') {
             if (process.platform !== 'darwin') { radioLocationPermissionUntil = Date.now() + 20000; return { browser: true }; }
             if (radioActionBusy) return { error: 'Finding the device location. Please wait.' };

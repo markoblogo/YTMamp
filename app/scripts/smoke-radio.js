@@ -17,11 +17,15 @@ for (const key of ['INTEGRATION_HOST', 'LASTFM_ENABLED', 'LASTFM_API_KEY', 'LAST
 const first = { name: 'Test Jazz 92.1 FM', url: 'https://radio.example.org/first', tags: 'jazz', countrycode: 'FR', language: 'French', state: 'Nantes', geo_lat: 47.22, geo_long: -1.55 };
 const second = { ...first, name: 'Test Rock FM 101.3', url: 'https://radio.example.org/second', tags: 'rock' };
 const online = { ...first, name: 'Internet Only', url: 'https://radio.example.org/online', geo_lat: null, geo_long: null };
-network.RadioBrowser.prototype.search = async () => [first, second, online];
+const broken = { ...online, name: 'Broken station', url: 'https://radio.example.org/broken' };
+network.RadioBrowser.prototype.search = async () => [first, second, online, broken];
 network.RadioBrowser.prototype.click = () => {};
 const wav = taggedWav({ seconds: 60, frequency: 440 });
 // Stub only the exported transport in this test process. Production has no LAN bypass.
-network.createRadioMediaHandler = () => async () => new Response(wav, { headers: { 'content-type': 'audio/wav', 'access-control-allow-origin': '*' } });
+network.createRadioMediaHandler = (resolve) => async (request) => {
+    const station = resolve(new URL(request.url).pathname.slice(1));
+    return station?.name === broken.name ? new Response('not audio', { headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } }) : new Response(wav, { headers: { 'content-type': 'audio/wav', 'access-control-allow-origin': '*' } });
+};
 dialog.showSaveDialog = async () => ({ canceled: false, filePath: output });
 let report; let record; let finished = false;
 ipcMain.on('radio-audio-report', (_event, value) => { report = value; });
@@ -45,6 +49,9 @@ async function run(window) {
     await waitFor(() => evaluate('document.body.classList.contains("radio-mode")'), 'radio source');
     await evaluate('document.getElementById("queue-toggle").click(); document.getElementById("radio-search-form").requestSubmit()');
     await waitFor(() => evaluate('document.querySelectorAll("#radio-grid .album-card").length === 3'), 'radio cards');
+    await waitFor(() => evaluate('document.getElementById("radio-notice").textContent.includes("1 unavailable hidden")'), 'broken stream is checked and hidden');
+    assert.equal(report?.playing === true, false, 'muted catalog checks must not start the main player');
+    assert.equal(await evaluate('document.getElementById("radio-grid").textContent.includes("Broken station")'), false);
     assert.equal(await evaluate('document.getElementById("radio-country") === null && document.getElementById("radio-city") === null'), true);
     await action('location', { lat: 47.22, lon: -1.55, label: 'Nantes', countrycode: 'FR' });
     await evaluate('document.getElementById("radio-local").click()');

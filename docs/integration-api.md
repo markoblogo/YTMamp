@@ -2,7 +2,7 @@
 
 YTMamp exposes a local HTTP API for external integrations (obsidian tools, scripts, widgets).
 
-In the 0.7.0 development preview the active RADIO source publishes station title/region and a finite live state (`durationSec: 0`, `positionSec: 0`). Existing play/pause and next/previous actions route to radio while RADIO is selected; next/previous use only the local FM station queue. Recording, station URLs and location changes are not exposed through the HTTP API.
+In the 0.7.2 development preview the active RADIO source publishes station title/region and a finite live state (`durationSec: 0`, `positionSec: 0`). Existing play/pause and next/previous actions route to radio while RADIO is selected; next/previous use only the local FM station queue. Recording, station URLs and location changes are not exposed through the HTTP API.
 
 - Host: `127.0.0.1` by default (local-only)
 - Default port: `18880`

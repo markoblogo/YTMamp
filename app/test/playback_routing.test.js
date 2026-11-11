@@ -155,7 +155,11 @@ test('radio stays isolated from inactive sources and untrusted frames; hide pres
     const action = fixture.handlers.get('radio-action');
     const invalid = { ...fixture.event, senderFrame: { url: 'https://example.com' } };
     assert.ok((await action(invalid, 'record', { action: 'start' })).error);
+    assert.ok((await action(invalid, 'stream-check', { id: 'c'.repeat(64), ok: false })).error);
+    assert.ok((await action(fixture.event, 'stream-check', { id: 'c'.repeat(64), ok: true })).error, 'inactive source cannot report checks');
     fixture.handlers.get('set-source')(fixture.event, 'radio');
+    assert.ok((await action(fixture.event, 'stream-check', { id: 'c'.repeat(64), ok: 'true' })).error);
+    assert.equal((await action(fixture.event, 'stream-check', { id: 'c'.repeat(64), ok: true })).ok, true);
     assert.equal((await action(fixture.event, 'play', { id: 'c'.repeat(64) })).ok, true);
     vm.runInContext('radioPlayer.receive({id:radioPlayer.id,revision:radioPlayer.revision,playing:true})', fixture.context);
     assert.equal(fixture.snapshot().track.title, 'Radio Test');
