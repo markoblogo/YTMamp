@@ -66,10 +66,11 @@ async function waitFor(predicate, label) {
 async function run(window) {
     const evaluate = (code) => window.webContents.executeJavaScript(code, true);
     assert.equal(await evaluate('document.getElementById("source-select").value'), 'local');
+    await waitFor(() => evaluate('!document.getElementById("open-folder").disabled'), 'initial library load');
     await evaluate('document.getElementById("open-folder").click()');
     await waitFor(() => evaluate('document.querySelectorAll("#queue-tracks button").length === 3'), 'folder import');
-    assert.equal(window.getContentSize()[1], 340);
-    assert.equal(await evaluate('document.documentElement.scrollWidth <= 360'), true);
+    assert.equal(window.getContentSize()[1], 560);
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 700'), true);
     await evaluate('document.querySelector("#queue-tracks button").click()');
     await waitFor(() => report?.playing && report.positionSec > 0.1, 'actual audio playback');
     assert.equal(Math.round(report.durationSec), 8);

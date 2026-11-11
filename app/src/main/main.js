@@ -1,6 +1,6 @@
 const { app, BrowserWindow, clipboard, ipcMain, Tray, Menu, nativeImage, screen, dialog, protocol } = require('electron');
 const { pathToFileURL } = require('node:url');
-const { scanMusicFolder } = require('./local_library');
+const { LocalCollection } = require('./local_collection');
 const { createLocalMediaHandler } = require('./local_media');
 const { LocalPlayer } = require('./local_player');
 
@@ -42,6 +42,10 @@ let activeSource = 'local';
 let ytmStatus = 'Need YTM Tab';
 const ytmSnapshot = { track: null, state: null };
 let folderScan;
+let libraryVisible = false;
+let hiddenByUser = false;
+let collection;
+let collectionReady;
 let choosingFolder = false;
 const localPlayer = new LocalPlayer();
 const pluginRuntimeStatusQueue = [];
@@ -712,7 +716,8 @@ let settings = {
     bridgeAuthToken: '',
     localFolder: '',
     localTrackId: '',
-    localVolume: 0.5
+    localVolume: 0.5,
+    playerScale: 100
 };
 
 function loadSettings() {
@@ -723,6 +728,7 @@ function loadSettings() {
             settings.startAtLogin = typeof settings.startAtLogin === 'boolean' ? settings.startAtLogin : !!settings.startAtLogin;
             settings.autoShowOnPlay = typeof settings.autoShowOnPlay === 'boolean' ? settings.autoShowOnPlay : true;
             settings.bridgeAuthToken = (typeof settings.bridgeAuthToken === 'string' && settings.bridgeAuthToken.length <= 512) ? settings.bridgeAuthToken : '';
+            settings.playerScale = [75, 100, 125, 150].includes(settings.playerScale) ? settings.playerScale : 100;
             if (settings.windowBounds && (typeof settings.windowBounds.x !== 'number' || typeof settings.windowBounds.y !== 'number')) {
                 settings.windowBounds = null;
             }
@@ -921,13 +927,62 @@ function getExpectedAuthToken() {
     return generated;
 }
 
+function playerSizeItems() {
+    return [75, 100, 125, 150].map((percent) => ({
+        id: 'player-size-' + percent, label: percent + '%', type: 'radio', checked: settings.playerScale === percent,
+        click: () => setPlayerSize(percent)
+    }));
+}
+
+function applyPlayerLayout() {
+    if (!mainWindow) return;
+    const scale = settings.playerScale / 100;
+    const area = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
+    mainWindow.webContents.setZoomFactor(scale);
+    mainWindow.setContentSize(
+        Math.min(area.width, Math.round((libraryVisible ? 700 : 360) * scale)),
+        Math.min(area.height, Math.round((libraryVisible ? 560 : 116) * scale))
+    );
+    const bounds = mainWindow.getBounds();
+    mainWindow.setPosition(
+        Math.max(area.x, Math.min(bounds.x, area.x + area.width - bounds.width)),
+        Math.max(area.y, Math.min(bounds.y, area.y + area.height - bounds.height))
+    );
+}
+
+function setPlayerSize(percent) {
+    if (![75, 100, 125, 150].includes(percent)) return;
+    settings.playerScale = percent;
+    saveSettings(); applyPlayerLayout(); updateTrayMenu(); updateApplicationMenu();
+}
+
+function updateApplicationMenu() {
+    const step = (direction) => {
+        const sizes = [75, 100, 125, 150];
+        setPlayerSize(sizes[Math.max(0, Math.min(sizes.length - 1, sizes.indexOf(settings.playerScale) + direction))]);
+    };
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+        ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+        { role: 'fileMenu' }, { role: 'editMenu' },
+        { label: 'View', submenu: [
+            { label: 'Player size', submenu: playerSizeItems() },
+            { label: 'Smaller', accelerator: 'CommandOrControl+-', click: () => step(-1) },
+            { label: 'Larger', accelerator: 'CommandOrControl+=', click: () => step(1) },
+            { label: 'Actual size', accelerator: 'CommandOrControl+0', click: () => setPlayerSize(100) },
+            { type: 'separator' }, { role: 'toggleDevTools' }
+        ] },
+        { role: 'windowMenu' }
+    ]));
+}
+
 function createWindow() {
+    libraryVisible = false;
     const savedBounds = boundsAreVisible(settings.windowBounds) ? settings.windowBounds : {};
     mainWindow = new BrowserWindow({
         x: savedBounds.x,
         y: savedBounds.y,
-        width: 360,
-        height: 116,
+        width: Math.round(360 * settings.playerScale / 100),
+        height: Math.round(116 * settings.playerScale / 100),
         useContentSize: true,
         frame: false,
         resizable: false,
@@ -937,6 +992,7 @@ function createWindow() {
         backgroundColor: '#000000',
         show: false,
         webPreferences: {
+            zoomFactor: settings.playerScale / 100,
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
@@ -944,13 +1000,18 @@ function createWindow() {
         },
     });
 
+    applyPlayerLayout();
     mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+    mainWindow.webContents.on('context-menu', () => {
+        Menu.buildFromTemplate([{ label: 'Player size', submenu: playerSizeItems() }]).popup({ window: mainWindow });
+    });
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
     mainWindow.webContents.on('did-finish-load', () => {
         mainWindow.webContents.send('source-change', activeSource);
         mainWindow.webContents.send('local-catalog', localPlayer.catalog());
+        if (folderScan) sendFolderNotice('Reading music folders and tags...', true);
         if (activeSource === 'local') {
             // Restoring a window never starts audio by itself.
             localPlayer.select(localPlayer.index, false);
@@ -988,7 +1049,7 @@ function createWindow() {
         saveWindowBounds();
         if (!isQuitting) {
             event.preventDefault();
-            mainWindow.hide();
+            hidePlayerWindow();
         }
     });
 }
@@ -999,7 +1060,9 @@ function updateTrayMenu() {
         { label: 'YTMamp', enabled: false },
         { type: 'separator' },
         { label: 'Show/Hide', click: () => toggleWindow() },
-        { label: 'Open music folder...', click: () => chooseMusicFolder() },
+        { label: 'Player size', submenu: playerSizeItems() },
+        { label: 'Add music folders...', click: () => chooseMusicFolder() },
+        { label: 'Refresh music library', click: () => changeCollection() },
         { label: 'Playback source', submenu: [
             { label: 'Local files', type: 'radio', checked: activeSource === 'local', click: () => setPlaybackSource('local') },
             { label: 'YouTube Music', type: 'radio', checked: activeSource === 'ytm', click: () => setPlaybackSource('ytm') }
@@ -1059,12 +1122,24 @@ function createTray() {
     });
 }
 
+function hidePlayerWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    hiddenByUser = true;
+    mainWindow.hide();
+}
+
+function showPlayerWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    hiddenByUser = false;
+    mainWindow.show();
+}
+
 function toggleWindow() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isVisible()) {
-        mainWindow.hide();
+        hidePlayerWindow();
     } else {
-        mainWindow.show();
+        showPlayerWindow();
     }
 }
 
@@ -1097,15 +1172,15 @@ function setupWebSocket() {
                 ws.send(JSON.stringify({ type: 'pong', v: 1 }));
             } else if (message.type === 'cmd' && message.cmd === 'showWindow') {
                 if (mainWindow) {
-                    mainWindow.show();
+                    showPlayerWindow();
                     mainWindow.setAlwaysOnTop(true);
                     mainWindow.focus();
                 }
             } else if (message.type === 'cmd' && message.cmd === 'hideWindow') {
-                if (mainWindow) mainWindow.hide();
+                hidePlayerWindow();
             } else if (message.type === 'event' && message.name === 'playingStarted' && activeSource === 'ytm') {
                 console.log('[Main] Received playingStarted event');
-                if (settings.autoShowOnPlay && mainWindow && !mainWindow.isVisible()) {
+                if (settings.autoShowOnPlay && !hiddenByUser && mainWindow && !mainWindow.isVisible()) {
                     console.log('[Main] Auto-showing window due to playback');
                     mainWindow.show();
                 }
@@ -1175,48 +1250,71 @@ function sendFolderNotice(message, busy = false) {
     if (mainWindow) mainWindow.webContents.send('folder-notice', { message, busy });
 }
 
-async function importMusicFolder(folder, restore = false) {
-    if (folderScan) folderScan.abort();
+async function ensureCollection() {
+    collectionReady ||= collection.load(typeof settings.localFolder === 'string' ? settings.localFolder : '');
+    await collectionReady;
+}
+
+async function changeCollection(folders = [], { restore = false, removeId = '' } = {}) {
+    if (folderScan) return;
     const controller = new AbortController();
     folderScan = controller;
-    sendFolderNotice('Reading music folder...', true);
+    sendFolderNotice('Reading music folders and tags...', true);
     try {
-        const library = await scanMusicFolder(folder, { signal: controller.signal });
+        await ensureCollection();
+        const library = await collection.update({ folders, removeId, signal: controller.signal,
+            onProgress: ({ processed, folder }) => sendFolderNotice('Reading tags: ' + processed + ' tracks, ' + folder, true) });
         controller.signal.throwIfAborted();
-        if (!restore) setPlaybackSource('local');
-        localPlayer.pause();
-        localPlayer.setLibrary(library, restore ? settings.localTrackId : '');
-        settings.localFolder = library.root;
+        if (folders.length && !restore) setPlaybackSource('local');
+        localPlayer.setLibrary(library, settings.localTrackId, { preservePlayback: true });
+        settings.localFolder = collection.roots[0]?.path || '';
+        settings.localTrackId = localPlayer.current?.id || '';
         saveSettings();
-        const suffix = library.limited ? ' Folder limit reached (5,000 tracks / 50,000 entries).' : '';
-        const skipped = library.skipped ? ` ${library.skipped} inaccessible folders skipped.` : '';
-        sendFolderNotice(`${library.tracks.length} tracks in ${library.name}.${suffix}${skipped}`);
+        const offline = library.roots.filter((root) => root.status === 'offline').length;
+        let message = library.tracks.length + ' tracks in ' + library.roots.length + ' folders.';
+        if (offline) message += ' ' + offline + ' folders offline. Reconnect and refresh.';
+        if (library.limited) message += ' Library limit reached.';
+        if (library.skipped) message += ' ' + library.skipped + ' inaccessible entries skipped.';
+        sendFolderNotice(message);
     } catch (error) {
-        if (!controller.signal.aborted) sendFolderNotice('Cannot read this folder. Reconnect the drive or choose another folder.');
+        if (controller.signal.aborted) sendFolderNotice('Library update canceled.');
+        else sendFolderNotice(error.code ? 'Cannot read the folder. Reconnect the drive and try again.' : error.message);
     } finally {
         if (folderScan === controller) folderScan = null;
     }
 }
 
+async function restoreLibrary() {
+    try {
+        await ensureCollection();
+        localPlayer.setLibrary(collection.snapshot(), settings.localTrackId);
+        await changeCollection([], { restore: true });
+    } catch {
+        sendFolderNotice('Cannot restore the library. Add your music folders again.');
+    }
+}
+
 async function chooseMusicFolder() {
-    if (choosingFolder) return;
+    if (choosingFolder || folderScan) return;
     choosingFolder = true;
     try {
         const result = await dialog.showOpenDialog(mainWindow, {
-            title: 'Choose a music folder', properties: ['openDirectory'],
+            title: 'Add music folders', properties: ['openDirectory', 'multiSelections'],
             ...(typeof settings.localFolder === 'string' && settings.localFolder ? { defaultPath: settings.localFolder } : {})
         });
-        if (!result.canceled && result.filePaths[0]) await importMusicFolder(result.filePaths[0]);
+        if (!result.canceled && result.filePaths.length) await changeCollection(result.filePaths);
     } finally {
         choosingFolder = false;
     }
 }
 
 function setupLocalPlayback() {
+    collection = new LocalCollection({ directory: app.getPath('userData') });
     localPlayer.volume = Number.isFinite(settings.localVolume) ? Math.max(0, Math.min(1, settings.localVolume)) : 0.5;
-    protocol.handle('ytmamp-media', createLocalMediaHandler((id) => {
-        const item = localPlayer.library.tracks.find((track) => track.id === id);
-        return item ? { ...item, root: localPlayer.library.root } : null;
+    protocol.handle('ytmamp-media', createLocalMediaHandler((id, kind) => {
+        if (kind === 'art') return collection.artwork(id);
+        const item = localPlayer.library.tracks.find((track) => track.id === id && track.available !== false);
+        return item ? { ...item, root: item.root || localPlayer.library.root } : null;
     }));
     localPlayer.on('audio', (command) => mainWindow?.webContents.send('local-audio-command', command));
     localPlayer.on('catalog', (catalog) => mainWindow?.webContents.send('local-catalog', catalog));
@@ -1255,19 +1353,26 @@ function setupIpc() {
     ipcMain.on('set-source', (event, source) => { if (isPlayerSender(event)) setPlaybackSource(source); });
     ipcMain.on('open-music-folder', (event) => { if (isPlayerSender(event)) chooseMusicFolder().catch(() => sendFolderNotice('Could not open the folder picker.')); });
     ipcMain.on('cancel-folder-scan', (event) => {
-        if (isPlayerSender(event) && folderScan) { folderScan.abort(); folderScan = null; sendFolderNotice('Folder scan canceled.'); }
+        if (isPlayerSender(event) && folderScan) folderScan.abort();
     });
-    ipcMain.on('select-local-track', (event, id) => {
+    ipcMain.on('refresh-library', (event) => { if (isPlayerSender(event)) changeCollection(); });
+    ipcMain.on('remove-library-folder', (event, id) => {
+        if (isPlayerSender(event) && typeof id === 'string' && /^[a-f0-9]{64}$/.test(id)) changeCollection([], { removeId: id });
+    });
+    ipcMain.on('play-local-album', (event, id) => {
+        if (isPlayerSender(event) && activeSource === 'local' && typeof id === 'string' && /^[a-f0-9]{64}$/.test(id)) localPlayer.playAlbum(id);
+    });
+    ipcMain.on('select-local-track', (event, id, albumId) => {
         if (!isPlayerSender(event) || activeSource !== 'local' || typeof id !== 'string') return;
-        const index = localPlayer.library.tracks.findIndex((item) => item.id === id);
-        if (index >= 0) localPlayer.select(index);
+        localPlayer.playTrack(id, typeof albumId === 'string' ? albumId : '');
     });
     ipcMain.on('local-audio-report', (event, report) => {
         if (isPlayerSender(event) && activeSource === 'local') localPlayer.receive(report);
     });
     ipcMain.on('set-queue-visible', (event, visible) => {
         if (!isPlayerSender(event) || typeof visible !== 'boolean') return;
-        mainWindow.setContentSize(360, visible ? 340 : 116);
+        libraryVisible = visible;
+        applyPlayerLayout();
     });
 
     ipcMain.on('quit-app', () => {
@@ -1275,8 +1380,8 @@ function setupIpc() {
         app.quit();
     });
 
-    ipcMain.on('hide-window', () => {
-        if (mainWindow) mainWindow.hide();
+    ipcMain.on('hide-window', (event) => {
+        if (isPlayerSender(event)) hidePlayerWindow();
     });
 }
 
@@ -1288,6 +1393,7 @@ app.whenReady().then(() => {
     setupLocalPlayback();
     createWindow();
     createTray();
+    updateApplicationMenu();
     setupIpc();
     configurePlayerCastBridge({
         getPlayerSnapshot: () => ({
@@ -1306,11 +1412,11 @@ app.whenReady().then(() => {
     });
     setupIntegrationServer();
     setupWebSocket();
-    if (typeof settings.localFolder === 'string' && settings.localFolder) importMusicFolder(settings.localFolder, true);
+    restoreLibrary();
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
-        else mainWindow.show();
+        else showPlayerWindow();
     });
 });
 
@@ -1321,6 +1427,7 @@ app.on('window-all-closed', function () {
 app.on('before-quit', () => {
     isQuitting = true;
     if (folderScan) folderScan.abort();
+    collection?.close();
     if (lastfmScrobbler) {
         lastfmScrobbler.stop();
     }

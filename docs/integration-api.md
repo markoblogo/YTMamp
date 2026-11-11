@@ -221,6 +221,7 @@ Allowed response headers for valid OBS calls:
 - `status` values are forwarded from bridge/app internals.
 - Payload formats for `track` and `state` follow normalized player payloads used by UI/plugin runtime.
 - On the local-player development branch, these endpoints report the selected source only. Local tracks include `source: "local"` and an opaque `mediaId`; absolute audio paths are not exposed. Local commands from Cardputer use the same controls as the desktop. The API envelope and Cardputer `source: "ytmamp"` remain v1-compatible.
+- Stage 2 local track labels come from embedded tags with filename/folder fallbacks. A local `cover` can be an app-only `ytmamp-media://art/<id>` URL; external HTTP clients cannot dereference that protocol and should use a placeholder. Library indexing, folder mutation and artwork files are not exposed through the HTTP API. Metadata/state envelope versions remain unchanged.
 - `/status`, `/current-track`, `/events` do not set browser CORS headers.
 - `/obs` sets CORS headers only for allowed origins from `OBS_ORIGIN_ALLOWLIST`.
 

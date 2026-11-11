@@ -6,6 +6,14 @@ Owner scope, 11 November 2026: a retro macOS player that starts in local mode, w
 
 Each stage is implemented and verified independently before starting the next one.
 
+Owner working agreement, 11 November 2026: work in bounded passes. State each pass's scope first; after its implementation/checks, report the result and open issues and stop for discussion. Do not roll directly into the next feature. Acceptance of one pass does not authorize starting every later pass without that discussion.
+
+Current checkpoints:
+
+- Stage 2 verification: accepted by the owner on 11 November after reporting that the player works. Mac UI checks confirmed 75%, 100%, 125% and 150% sizes through keyboard/menu controls and collapse while local playback continued. Automated tests cover restart, multiple roots and offline/reconnect; physical drive disconnection was not performed during that UI pass.
+- A separate 0.6.1 pass adds an explicit **_** button for hiding the window while continuing playback. **X** remains Quit. Return is through the menu-bar/tray icon or Dock; the music library stays intact.
+- Radio is the next feature, pending the next pass discussion. No station catalogue or radio playback has been implemented yet.
+
 | Stage | Deliverable | Completion check |
 | --- | --- | --- |
 | 1 | Single selected folder and subfolders; local playback, queue, transport controls, local default, existing YT bridge switch | Play and seek real audio; next/previous, shuffle/repeat, errors, restore selected folder, source isolation; macOS listening check |
@@ -17,9 +25,21 @@ Each stage is implemented and verified independently before starting the next on
 
 Stage 5 initially adapts the visual deck to normal local audio. The original vinyl project also performs physical groove/stylus simulation and pre-processes imported audio. Full sound simulation is a separately measured enhancement after the visual version; it must not delay normal playback or create an unbounded cache.
 
+Owner UI requirement, 11 November 2026: keep the transport as the compact mini-player. The library/search and future vinyl deck are collapsible panels beneath it. Collapsing a panel preserves playback and its browsing state. A collapsed vinyl panel must suspend its animation/rendering workload; it must not stop the shared audio engine. Stage 2 provides both the LIBRARY toggle and an explicit COLLAPSE button; the vinyl panel itself belongs to stage 5.
+
+## Radio requirements for the next stage
+
+- A collapsible station panel using a grid of logos, visually analogous to album cards, with a fallback when a station has no usable logo.
+- Search/filter by station name, music genre, broadcast language and country/region, with combinable filters and clear/reset controls.
+- Sorting by name, genre, language and region. Unknown metadata must remain visibly unspecified rather than inferred.
+- Keep the compact transport and scaling behavior. Source switching must stop the outgoing source so stations and local tracks do not play together.
+- Add favorites, custom stream URLs and recovery/error feedback as planned for stage 3.
+
+Suggested radio passes, each followed by a stop: (1) source/directory verification and station catalogue with cards, search and sorting; (2) playback, source switching, favorites and reconnect handling; (3) Mac acceptance checks and fixes. The exact first radio pass is agreed after the hide-button pass is reviewed.
+
 ## Candidate donors reviewed
 
-These are candidates, not bundled dependencies. No donor code has been copied in stage 1.
+These are candidates, not bundled applications. Stages 1 and 2 keep the existing renderer and player; stage 2 adds only the MIT-licensed `music-metadata` parser and its dependencies for tag reading.
 
 | Project | License reported by repository | Useful parts | Integration decision |
 | --- | --- | --- | --- |
@@ -50,4 +70,20 @@ Before copying any module, verify the actual license file and file-level notices
 
 The desktop automation does not replace the owner's macOS listening check. Before stage 1 is called release-ready, verify an actual music folder on the Mac, including YT source switching with the updated companion. Do not tag or merge solely because packaging succeeded.
 
-CI produces an unsigned Apple Silicon preview and matching v0.5.0 companion as `YTMamp-stage1-macos-arm64`. These are preview artifacts, not a tagged public release. The first Linux CI pass confirmed actual audio decoding, analyzer output and seeking; the final dependency lock and macOS package are checked again on the final branch revision.
+Stage 1 produced an ad-hoc signed Apple Silicon preview and matching v0.5.0 companion as `YTMamp-stage1-macos-arm64`. The owner installed and confirmed local playback on the Mac. These are preview artifacts, not a tagged public release.
+
+## Stage 2 behavior
+
+- **ADD** accepts multiple folders and adds them to the saved collection. Existing stage 1 settings migrate automatically. Parent/child selections share one track entry; removing either root leaves tracks that are still covered by another root.
+- **LIBRARY** expands to 700 × 560, with tracks, albums, a folder selector and search across title, artist, album, album artist, genre, year and relative filename. Search ignores case and accents and requires all entered words to match. Browsing and searching do not change playback.
+- **COLLAPSE** or the top **LIBRARY** toggle returns to the 360 × 116 mini-player. Reopening retains the query, folder filter and selected album, while audio continues on the same track.
+- **Player size**, available by right click, tray and View menu, saves 75%, 100%, 125% or 150%. At 75% the mini-player is 270 × 87; at 100% it retains 360 × 116. Cmd/Ctrl `-`, `=` and `0` shrink, enlarge and reset. Controls scale together, and the expanded panel is bounded by the current display's work area. Resizing does not reload audio.
+- Embedded tags are read without rewriting files. Missing title/artist/album values use filename, Unknown artist and parent-folder labels. Albums use album artist plus album name, or the physical folder when no album tag exists. Disc and track numbers determine album playback order.
+- **Play album** sets a queue within that album; the last track stops unless repeat or shuffle is enabled. Selecting a track in the full collection restores the full collection queue.
+- Embedded front covers are preferred. If no supported embedded picture exists, the containing folder is checked for `cover.jpg`, `cover.png`, `folder.jpg`, `folder.png`, `front.jpg`, `front.png` or `cover.webp`. JPEG, PNG and WebP pictures up to 2 MiB are accepted. Missing or evicted art uses a placeholder.
+- Only selected roots are rescanned, at startup or **Refresh**. Unchanged files reuse saved tags. Root and metadata updates commit atomically; cancelation leaves the previous collection intact. Adding/refreshing does not reload the playing track while it remains available.
+- Offline roots retain cached metadata and artwork for browsing/search. Their tracks cannot play until the drive returns and **Refresh** succeeds. Removing a root changes the library only; original files are never deleted.
+- Limits: 20 roots, 10,000 unique tracks across the collection, 5,000 tracks/50,000 entries examined per root, 16 MiB manifest and 32 MiB artwork cache. The renderer receives opaque IDs, relative labels and controlled artwork URLs. No audio files are copied.
+- Parsing runs sequentially in one worker with a per-file timeout and memory limits. There is no background whole-machine discovery, tag editor, radio or vinyl engine in this stage.
+
+`npm run test:library:desktop` uses generated tagged WAVs and an isolated profile to check actual metadata, artwork decoding, search, playback continuity while adding roots, album boundaries, reconnect and safe removal. CI also exercises the metadata worker from the signed Mac package's ASAR. The stage 2 artifact is `YTMamp-stage2-macos-arm64`, version 0.6.0. Manual Mac listening and real browser authentication remain separate from these automated checks.

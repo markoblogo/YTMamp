@@ -15,8 +15,12 @@ Local playback is being introduced in a staged development branch. The published
 
 ## What it does
 
-- Play local music from a selected folder and its subfolders without copying audio. Use **FOLDER**, **LIST** and the **LOCAL / YT MUSIC** selector; local playback works without a browser or internet connection.
-- Restore the last local folder and selected track paused. MP3, WAV, FLAC, M4A, AAC, OGG and OPUS files are recognized; decoder support depends on Electron. Current labels come from filenames; embedded tags and covers follow in the next stage.
+- Add several music folders and their subfolders without copying audio. **ADD** opens the folder picker; **LIBRARY** shows tracks, albums and search. Local playback works without a browser or internet connection.
+- Collapse the library with **COLLAPSE** or the **LIBRARY** toggle; reopening keeps its search and album selection without interrupting playback.
+- Choose **Player size** from a right click, the tray menu or **View**: 75%, 100%, 125% or 150%. The size is saved; 75% gives a 270 × 87 mini-player. Cmd/Ctrl `-`, `=` and `0` also change/reset size.
+- Use **_** to hide the player and keep music playing. Restore it from the menu-bar/tray icon or the Dock. **X** quits the app and stops playback. Explicit hiding also suppresses YouTube auto-show until you bring the player back.
+- Read embedded titles, artists, albums, track/disc numbers, genres and cover art. Search ignores letter case and accents, and can be limited to one folder. **Play album** follows disc/track order within that album.
+- Restore the library and selected track paused. MP3, WAV, FLAC, M4A, AAC, OGG and OPUS files are recognized; decoder support depends on Electron. Missing tags fall back to filenames and folder names.
 - Play, pause, skip, seek, change volume, like, shuffle, and repeat.
 - Show track metadata and a live oscilloscope in a 360 × 116 always-on-top window.
 - Integrate with system tray controls, media keys, startup settings, Last.fm, OBS, and a versioned local API.
@@ -33,12 +37,12 @@ Download the latest files from [GitHub Releases](https://github.com/markoblogo/Y
 | Linux | `YTMamp-*-linux.AppImage` or `.deb` |
 | Chromium extension | `YTMamp-*-extension.zip` (v0.4.0+) |
 
-Release builds are currently unsigned and not notarized. Your operating system may ask you to confirm the first launch.
+Published release builds are currently unsigned and not notarized. Development Mac previews use ad-hoc signatures with archive verification; they are not Apple-notarized. Your operating system may ask you to confirm the first launch.
 
 ## Set up in five steps
 
-1. Install and launch the desktop app. It remains available from the menu bar or system tray.
-2. Extract the extension ZIP. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted folder.
+1. Install and launch the desktop app. In the development preview, choose **ADD** and select your music folders for local listening. It remains available from the menu bar or system tray.
+2. For YouTube Music, extract the extension ZIP. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted folder.
 3. In the YTMamp tray menu choose **Copy bridge token**. Paste it into the extension popup and select **Save** and **Connect**.
 4. Open [YouTube Music](https://music.youtube.com) and click once in the page so the browser can start audio capture for the waveform.
 5. Pin the extension for quick access. Install it separately in every browser profile you use.
@@ -77,6 +81,8 @@ npm run pack
 CI checks lint, tests, dependency audit, and an unpacked app package on macOS, Windows, and Ubuntu. Interactive desktop/browser checks remain separate in the [release smoke plan](docs/smoke-test.md).
 
 `npm run test:desktop` runs an isolated, muted Electron playback smoke with generated audio. The [multi-source implementation plan](docs/roadmap/multi-source-player.md) defines stage boundaries and candidate donor projects. Whole-computer music discovery is excluded; only explicitly selected music folders are used.
+
+`npm run test:library:desktop` exercises folder addition, real tags and image decoding, album queues, search and external-drive recovery. The library supports up to 20 selected roots and 10,000 unique tracks, with an additional 5,000-track/50,000-entry scan limit per root. Its metadata manifest is capped at 16 MiB and artwork cache at 32 MiB (2 MiB per picture). These limits protect small disks; original audio stays in place. **Refresh** picks up changed music and reconnected drives. Removing a folder from the library keeps its files intact. Tag editing is not included.
 
 ## Integrations
 

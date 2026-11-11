@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - Unreleased development preview
+
+### Added
+- An explicit hide button next to Quit: the window leaves the screen while the existing audio engine continues playing, with restoration through the tray/menu bar or Dock.
+- Clear Quit/Hide labels and keyboard-accessible window buttons, including at the smallest player size.
+
+### Fixed
+- An explicit hide is no longer undone by a new YouTube playingStarted event. Showing the player explicitly restores normal auto-show behavior.
+- Validate the renderer sender before accepting a hide-window request.
+
+## [0.6.0] - Unreleased development preview
+
+### Added
+- Persistent library from several explicitly selected music folders, including nested folders and external drives; overlapping selections do not duplicate tracks.
+- Read-only embedded metadata through the MIT-licensed `music-metadata` parser in a bounded worker, with filename/folder fallbacks.
+- Embedded and folder cover art, album browsing, disc/track ordering and album-scoped playback queues.
+- Accent-insensitive collection search and a folder filter in an expandable library window.
+- Explicit library collapse/reopen controls that preserve browsing and playback, plus saved 75%/100%/125%/150% player sizes through context, tray and View menus.
+- Refresh, cancel, safe folder removal and cached offline albums that return after reconnecting and refreshing.
+- Generated tagged-audio tests, an Electron library smoke and a signed Mac package worker-loading check.
+
+### Changed
+- Migrate the stage 1 music folder automatically; retain the paused startup behavior and preserve playback while updating the library.
+- Bound metadata and artwork storage without copying music or searching the whole computer.
+
+## [0.5.0] - Unreleased development preview
+
+### Added
+- Local folder playback and queue, local startup mode and switching to the existing YouTube Music browser companion.
+- Sandboxed media streaming with seeking, local waveform, saved folder/track/volume and an isolated Electron playback smoke.
+- Ad-hoc signed Apple Silicon previews with strict signature verification before and after ZIP extraction.
+
 ## [0.4.1] - 2026-09-14
 
 ### Added

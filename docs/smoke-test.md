@@ -31,3 +31,33 @@ Record automated CI, release asset publication, and manual runtime checks separa
 - Disconnect/reconnect an external drive; verify actionable feedback and successful folder re-selection. Check a corrupt file and an empty folder.
 - Switch to YT MUSIC with the updated companion and a signed-in tab. Verify YT controls. Switch back to LOCAL: outgoing YT pauses, local metadata returns and local audio stays paused until Play.
 - `npm run test:desktop` covers generated WAV playback, analyzer output, seek, pause, next, switching and bad files with muted output and isolated settings. macOS listening, actual YT authentication and external-drive recovery remain separate interactive checks.
+
+## Stage 2 music library (0.6.0 development preview)
+
+Automated coverage is separate from the following owner checks:
+
+1. Update the existing Mac app while retaining its profile. Confirm the stage 1 folder and selected track migrate, with LOCAL selected and playback paused.
+2. Use ADD to select two music folders. Confirm tags, embedded covers and folder covers; nested/overlapping folders do not duplicate tracks.
+3. Open LIBRARY. Search by artist, album, Cyrillic text and genre; test the folder filter and no-results feedback. Switch between tracks and albums without interrupting audio.
+4. Play an album with numbered tracks. Confirm its queue ends at the album boundary; repeat/shuffle remain scoped to that queue. Add or refresh another folder during playback and confirm continuity.
+5. Restart. Disconnect an external music drive and refresh: its albums remain searchable but offline. Reconnect and refresh, then play again.
+6. Remove one root from the library. Verify its original files are intact and overlapping tracks still belong to any remaining root. Test canceling a large import.
+7. Confirm the mini-player remains compact and the expanded library stays within the display. Check audible output on representative MP3, FLAC, M4A and WAV files.
+8. Collapse the library with COLLAPSE and reopen with LIBRARY. Confirm the query, album/folder selection and playback are preserved. The future vinyl deck must follow the same panel behavior and suspend rendering when collapsed.
+9. Set Player size to 75% by right click or View menu. Confirm the full transport fits in 270 × 87, reopen the library, then test 125%/150% and reset with Cmd/Ctrl+0. Reopen the app and confirm the chosen size persists. Scaling must preserve the selected track, playback and filters and keep the window in the display's work area.
+
+`npm run test:library:desktop` covers generated tagged WAV decoding, image decoding, multiple roots, accent-insensitive search, album playback boundaries, offline/reconnect and safe removal under Linux Xvfb. Unit tests cover restart, cancellation, containment, cache budgets and public catalog fields. A Mac CI check loads the real metadata worker and parser from the signed app's ASAR. These checks use generated music and temporary profiles, not the owner's collection.
+
+Observed on the owner's Apple Silicon Mac, 11 November 2026: the 0.6.0 development preview replaced the existing app through Finder and launched from the installed Applications folder without the previous damaged-app warning. The saved external-drive folder produced 165 tracks with tags and embedded covers; search narrowed the list, playback time advanced on an actual MP3, pause worked, and volume remained 31%. Album browsing exposed seven folder/tag groups. Listening quality, a physical drive disconnect and YouTube authentication were not claimed by this UI check. The first migration selection issue found during this check has a regression test; final preview validation is linked from PR #15.
+
+Follow-up verification, 11 November 2026: 75% (270 × 87), 100% (360 × 116), 125% (450 × 145) and 150% (540 × 174) mini-player layouts were observed on the Mac without clipped controls. The View menu's Larger action worked; automated input did not activate its increase shortcut, which is an input/shortcut observation rather than a confirmed application defect. COLLAPSE hid the library while the same local track continued from 02:30 to 02:44; Pause remained available. The owner then reported that everything appeared to work and accepted this pass. Multiple-root/restart/offline tests retain their automated status; no physical external drive was disconnected.
+
+## 0.6.1 hide-button pass
+
+- Click **_** during playback: the window disappears, the track keeps advancing and its identity/revision stays unchanged.
+- Restore using the menu-bar/tray icon or Dock: the same track, scale, query and album/folder view return.
+- **X** remains Quit and ends playback. Hiding and quitting are distinct actions with explicit tooltips.
+- At 75%, both window buttons and the library controls remain visible inside the header.
+- With YT selected, a new playingStarted event must not reopen a window explicitly hidden by the user. Explicit restore re-enables the normal show behavior.
+
+The Electron library smoke exercises real audio while hidden and restored. Routing tests cover sender validation, lack of pause/reload on hide, tray restoration and suppression of YouTube auto-show. Manual Mac observation is recorded separately from automated checks.
