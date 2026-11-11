@@ -141,7 +141,7 @@ test('search matches accent-insensitive artist/title/album/genre and supports fo
 test('first migration restores the saved track after indexing an initially empty cache', async (t) => {
     const f = await setup(t);
     await f.collection.load(f.first);
-    const selectedId = createHash('sha256').update(path.join(f.album, 'a-second.wav')).digest('hex');
+    const selectedId = createHash('sha256').update(await fs.realpath(path.join(f.album, 'a-second.wav'))).digest('hex');
     const player = new LocalPlayer();
     player.setLibrary(f.collection.snapshot(), selectedId);
     assert.equal(player.current, null);

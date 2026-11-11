@@ -54,7 +54,11 @@ class LocalCollection {
             }
             loaded = true;
         } catch { /* Missing or corrupt cache: migrate the stage 1 folder safely. */ }
-        if (!loaded && typeof legacyFolder === 'string' && path.isAbsolute(legacyFolder)) this.roots = [this.makeRoot(path.resolve(legacyFolder))];
+        if (!loaded && typeof legacyFolder === 'string' && path.isAbsolute(legacyFolder)) {
+            let legacyRoot = path.resolve(legacyFolder);
+            try { legacyRoot = await this.canonicalFolder(legacyRoot); } catch { /* Keep an offline legacy root. */ }
+            this.roots = [this.makeRoot(legacyRoot)];
+        }
         for (const file of await fs.readdir(this.artworkDirectory)) {
             if (!/^[a-f0-9]{64}\.bin$/.test(file)) continue;
             try {
