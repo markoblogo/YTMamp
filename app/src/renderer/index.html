@@ -17,7 +17,7 @@
                 <option value="ytm">YT MUSIC</option>
             </select>
             <button id="open-folder" title="Add music folders" aria-label="Add music folders">ADD</button>
-            <button id="queue-toggle" aria-expanded="false" aria-controls="local-queue">LIBRARY</button>
+            <button id="queue-toggle" aria-label="Open music library" aria-expanded="false" aria-controls="local-queue">LIBRARY</button>
             <div id="status-group">
                 <div id="vol-status">VOL: --</div>
                 <div id="status-led" title="Offline"></div>
@@ -68,6 +68,7 @@
             <input id="library-search" type="search" aria-label="Search music library" placeholder="Search title, artist, album, genre..." maxlength="200" autocomplete="off">
             <button id="library-clear">Clear</button>
             <button id="library-refresh" title="Check added folders for changes">Refresh</button>
+            <button id="library-collapse" title="Collapse library and keep playing">Collapse</button>
         </div>
         <div id="library-roots" aria-label="Added music folders"></div>
         <div id="library-filters">

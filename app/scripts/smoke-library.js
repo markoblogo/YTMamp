@@ -57,6 +57,15 @@ async function run(window) {
     assert.equal(report.id, firstId); assert.equal(report.revision, revision);
     await evaluate('const search=document.getElementById("library-search"); search.value="bjork cafe"; search.dispatchEvent(new Event("input"));');
     await waitFor(() => evaluate('document.querySelectorAll("#queue-tracks button").length === 2'), 'accent-insensitive search');
+    const beforeCollapse = { id: report.id, revision: report.revision };
+    await evaluate('document.getElementById("library-collapse").click()');
+    await waitFor(() => window.getContentBounds().height === 116, 'collapse to mini-player');
+    assert.equal(await evaluate('document.getElementById("local-queue").hidden'), true);
+    await evaluate('document.getElementById("queue-toggle").click()');
+    await waitFor(() => window.getContentBounds().height === 560, 'reopen library');
+    assert.equal(await evaluate('document.getElementById("library-search").value'), 'bjork cafe');
+    assert.equal(await evaluate('document.querySelectorAll("#queue-tracks button").length'), 2);
+    assert.equal(report.id, beforeCollapse.id); assert.equal(report.revision, beforeCollapse.revision); assert.equal(report.playing, true);
     await evaluate('document.getElementById("library-clear").click(); document.getElementById("view-albums").click();');
     await waitFor(() => evaluate('document.querySelectorAll(".album-card").length === 2'), 'album grid');
     await waitFor(() => evaluate('[...document.querySelectorAll("#album-grid img")].every(image => image.complete && image.naturalWidth > 0)'), 'artwork decoding and CSP');

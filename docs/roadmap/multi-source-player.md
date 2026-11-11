@@ -17,6 +17,8 @@ Each stage is implemented and verified independently before starting the next on
 
 Stage 5 initially adapts the visual deck to normal local audio. The original vinyl project also performs physical groove/stylus simulation and pre-processes imported audio. Full sound simulation is a separately measured enhancement after the visual version; it must not delay normal playback or create an unbounded cache.
 
+Owner UI requirement, 11 November 2026: keep the transport as the compact mini-player. The library/search and future vinyl deck are collapsible panels beneath it. Collapsing a panel preserves playback and its browsing state. A collapsed vinyl panel must suspend its animation/rendering workload; it must not stop the shared audio engine. Stage 2 provides both the LIBRARY toggle and an explicit COLLAPSE button; the vinyl panel itself belongs to stage 5.
+
 ## Candidate donors reviewed
 
 These are candidates, not bundled applications. Stages 1 and 2 keep the existing renderer and player; stage 2 adds only the MIT-licensed `music-metadata` parser and its dependencies for tag reading.
@@ -56,6 +58,7 @@ Stage 1 produced an ad-hoc signed Apple Silicon preview and matching v0.5.0 comp
 
 - **ADD** accepts multiple folders and adds them to the saved collection. Existing stage 1 settings migrate automatically. Parent/child selections share one track entry; removing either root leaves tracks that are still covered by another root.
 - **LIBRARY** expands to 700 × 560, with tracks, albums, a folder selector and search across title, artist, album, album artist, genre, year and relative filename. Search ignores case and accents and requires all entered words to match. Browsing and searching do not change playback.
+- **COLLAPSE** or the top **LIBRARY** toggle returns to the 360 × 116 mini-player. Reopening retains the query, folder filter and selected album, while audio continues on the same track.
 - Embedded tags are read without rewriting files. Missing title/artist/album values use filename, Unknown artist and parent-folder labels. Albums use album artist plus album name, or the physical folder when no album tag exists. Disc and track numbers determine album playback order.
 - **Play album** sets a queue within that album; the last track stops unless repeat or shuffle is enabled. Selecting a track in the full collection restores the full collection queue.
 - Embedded front covers are preferred. If no supported embedded picture exists, the containing folder is checked for `cover.jpg`, `cover.png`, `folder.jpg`, `folder.png`, `front.jpg`, `front.png` or `cover.webp`. JPEG, PNG and WebP pictures up to 2 MiB are accepted. Missing or evicted art uses a placeholder.

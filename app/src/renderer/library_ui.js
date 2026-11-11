@@ -29,6 +29,7 @@
         visible = value;
         $('local-queue').hidden = !value;
         $('queue-toggle').setAttribute('aria-expanded', String(value));
+        $('queue-toggle').setAttribute('aria-label', value ? 'Collapse music library' : 'Open music library');
         api.setQueueVisible(value);
         if (value) $('library-search').focus();
     }
@@ -110,6 +111,7 @@
     $('source-select').addEventListener('change', (event) => api.setSource(event.target.value));
     $('open-folder').addEventListener('click', () => { setVisible(true); api.openMusicFolder(); });
     $('queue-toggle').addEventListener('click', () => setVisible(!visible));
+    $('library-collapse').addEventListener('click', () => { setVisible(false); $('queue-toggle').focus(); });
     $('library-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(render, 120); });
     $('library-clear').addEventListener('click', () => { $('library-search').value = ''; render(); $('library-search').focus(); });
     $('library-folder-filter').addEventListener('change', () => { albumId = ''; render(); });

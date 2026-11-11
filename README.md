@@ -16,6 +16,7 @@ Local playback is being introduced in a staged development branch. The published
 ## What it does
 
 - Add several music folders and their subfolders without copying audio. **ADD** opens the folder picker; **LIBRARY** shows tracks, albums and search. Local playback works without a browser or internet connection.
+- Collapse the library with **COLLAPSE** or the **LIBRARY** toggle; reopening keeps its search and album selection without interrupting playback.
 - Read embedded titles, artists, albums, track/disc numbers, genres and cover art. Search ignores letter case and accents, and can be limited to one folder. **Play album** follows disc/track order within that album.
 - Restore the library and selected track paused. MP3, WAV, FLAC, M4A, AAC, OGG and OPUS files are recognized; decoder support depends on Electron. Missing tags fall back to filenames and folder names.
 - Play, pause, skip, seek, change volume, like, shuffle, and repeat.
