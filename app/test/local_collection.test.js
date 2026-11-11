@@ -7,7 +7,7 @@ const { createHash } = require('node:crypto');
 const { LocalCollection } = require('../src/main/local_collection');
 const { LocalPlayer } = require('../src/main/local_player');
 const { createLocalMediaHandler } = require('../src/main/local_media');
-const { PNG } = require('../scripts/test-audio-fixture');
+const { PNG } = require('../scripts/audio-fixture');
 const view = require('../src/renderer/library_view');
 
 async function setup(t, options = {}) {
