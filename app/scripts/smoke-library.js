@@ -60,10 +60,14 @@ async function run(window) {
     await evaluate('document.getElementById("library-clear").click(); document.getElementById("view-albums").click();');
     await waitFor(() => evaluate('document.querySelectorAll(".album-card").length === 2'), 'album grid');
     await waitFor(() => evaluate('[...document.querySelectorAll("#album-grid img")].every(image => image.complete && image.naturalWidth > 0)'), 'artwork decoding and CSP');
+    const albumScreenshot = (await window.webContents.capturePage()).toPNG();
+    fs.writeFileSync(path.join(__dirname, '../library-albums-smoke.png'), albumScreenshot);
+    console.log('LIBRARY_ALBUMS_PREVIEW:' + albumScreenshot.toString('base64'));
+    const albumRevision = report.revision;
     await evaluate('[...document.querySelectorAll(".album-card")].find(button => button.textContent.includes("Café du matin")).click(); document.getElementById("album-play").click();');
-    await waitFor(() => report?.id === firstId && report?.playing, 'play album');
+    await waitFor(() => report?.id === firstId && report.revision > albumRevision && report.playing && report.positionSec > 0.1 && report.durationSec > 19.9, 'play album');
     await evaluate('window.electronAPI.sendCommand({v:1,type:"cmd",cmd:"seek",valueSec:19.85})');
-    await waitFor(async () => report?.playing && report.id !== firstId && await evaluate('document.getElementById("title").textContent === "Second Movement"'), 'album next track');
+    await waitFor(async () => report?.playing && report.positionSec > 0.1 && report.durationSec > 19.9 && report.id !== firstId && await evaluate('document.getElementById("title").textContent === "Second Movement"'), 'album next track');
     await evaluate('window.electronAPI.sendCommand({v:1,type:"cmd",cmd:"seek",valueSec:19.85})');
     await waitFor(() => report && !report.playing && report.positionSec > 19.8, 'end album');
     assert.equal(await evaluate('document.getElementById("title").textContent'), 'Second Movement');

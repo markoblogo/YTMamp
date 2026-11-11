@@ -108,6 +108,7 @@ jobs:
             app/ci-smoke-output.log
             app/local-playback-smoke.png
             app/library-smoke.png
+            app/library-albums-smoke.png
 
       - name: Generate CI smoke checklist
         run: node scripts/generate-smoke-checklist.js
