@@ -6,6 +6,14 @@ Owner scope, 11 November 2026: a retro macOS player that starts in local mode, w
 
 Each stage is implemented and verified independently before starting the next one.
 
+Owner working agreement, 11 November 2026: work in bounded passes. State each pass's scope first; after its implementation/checks, report the result and open issues and stop for discussion. Do not roll directly into the next feature. Acceptance of one pass does not authorize starting every later pass without that discussion.
+
+Current checkpoints:
+
+- Stage 2 verification: accepted by the owner on 11 November after reporting that the player works. Mac UI checks confirmed 75%, 100%, 125% and 150% sizes through keyboard/menu controls and collapse while local playback continued. Automated tests cover restart, multiple roots and offline/reconnect; physical drive disconnection was not performed during that UI pass.
+- A separate 0.6.1 pass adds an explicit **_** button for hiding the window while continuing playback. **X** remains Quit. Return is through the menu-bar/tray icon or Dock; the music library stays intact.
+- Radio is the next feature, pending the next pass discussion. No station catalogue or radio playback has been implemented yet.
+
 | Stage | Deliverable | Completion check |
 | --- | --- | --- |
 | 1 | Single selected folder and subfolders; local playback, queue, transport controls, local default, existing YT bridge switch | Play and seek real audio; next/previous, shuffle/repeat, errors, restore selected folder, source isolation; macOS listening check |
@@ -18,6 +26,16 @@ Each stage is implemented and verified independently before starting the next on
 Stage 5 initially adapts the visual deck to normal local audio. The original vinyl project also performs physical groove/stylus simulation and pre-processes imported audio. Full sound simulation is a separately measured enhancement after the visual version; it must not delay normal playback or create an unbounded cache.
 
 Owner UI requirement, 11 November 2026: keep the transport as the compact mini-player. The library/search and future vinyl deck are collapsible panels beneath it. Collapsing a panel preserves playback and its browsing state. A collapsed vinyl panel must suspend its animation/rendering workload; it must not stop the shared audio engine. Stage 2 provides both the LIBRARY toggle and an explicit COLLAPSE button; the vinyl panel itself belongs to stage 5.
+
+## Radio requirements for the next stage
+
+- A collapsible station panel using a grid of logos, visually analogous to album cards, with a fallback when a station has no usable logo.
+- Search/filter by station name, music genre, broadcast language and country/region, with combinable filters and clear/reset controls.
+- Sorting by name, genre, language and region. Unknown metadata must remain visibly unspecified rather than inferred.
+- Keep the compact transport and scaling behavior. Source switching must stop the outgoing source so stations and local tracks do not play together.
+- Add favorites, custom stream URLs and recovery/error feedback as planned for stage 3.
+
+Suggested radio passes, each followed by a stop: (1) source/directory verification and station catalogue with cards, search and sorting; (2) playback, source switching, favorites and reconnect handling; (3) Mac acceptance checks and fixes. The exact first radio pass is agreed after the hide-button pass is reviewed.
 
 ## Candidate donors reviewed
 

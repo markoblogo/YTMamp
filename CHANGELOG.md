@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - Unreleased development preview
+
+### Added
+- An explicit hide button next to Quit: the window leaves the screen while the existing audio engine continues playing, with restoration through the tray/menu bar or Dock.
+- Clear Quit/Hide labels and keyboard-accessible window buttons, including at the smallest player size.
+
+### Fixed
+- An explicit hide is no longer undone by a new YouTube playingStarted event. Showing the player explicitly restores normal auto-show behavior.
+- Validate the renderer sender before accepting a hide-window request.
+
 ## [0.6.0] - Unreleased development preview
 
 ### Added

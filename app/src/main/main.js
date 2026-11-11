@@ -43,6 +43,7 @@ let ytmStatus = 'Need YTM Tab';
 const ytmSnapshot = { track: null, state: null };
 let folderScan;
 let libraryVisible = false;
+let hiddenByUser = false;
 let collection;
 let collectionReady;
 let choosingFolder = false;
@@ -1048,7 +1049,7 @@ function createWindow() {
         saveWindowBounds();
         if (!isQuitting) {
             event.preventDefault();
-            mainWindow.hide();
+            hidePlayerWindow();
         }
     });
 }
@@ -1121,12 +1122,24 @@ function createTray() {
     });
 }
 
+function hidePlayerWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    hiddenByUser = true;
+    mainWindow.hide();
+}
+
+function showPlayerWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    hiddenByUser = false;
+    mainWindow.show();
+}
+
 function toggleWindow() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isVisible()) {
-        mainWindow.hide();
+        hidePlayerWindow();
     } else {
-        mainWindow.show();
+        showPlayerWindow();
     }
 }
 
@@ -1159,15 +1172,15 @@ function setupWebSocket() {
                 ws.send(JSON.stringify({ type: 'pong', v: 1 }));
             } else if (message.type === 'cmd' && message.cmd === 'showWindow') {
                 if (mainWindow) {
-                    mainWindow.show();
+                    showPlayerWindow();
                     mainWindow.setAlwaysOnTop(true);
                     mainWindow.focus();
                 }
             } else if (message.type === 'cmd' && message.cmd === 'hideWindow') {
-                if (mainWindow) mainWindow.hide();
+                hidePlayerWindow();
             } else if (message.type === 'event' && message.name === 'playingStarted' && activeSource === 'ytm') {
                 console.log('[Main] Received playingStarted event');
-                if (settings.autoShowOnPlay && mainWindow && !mainWindow.isVisible()) {
+                if (settings.autoShowOnPlay && !hiddenByUser && mainWindow && !mainWindow.isVisible()) {
                     console.log('[Main] Auto-showing window due to playback');
                     mainWindow.show();
                 }
@@ -1367,8 +1380,8 @@ function setupIpc() {
         app.quit();
     });
 
-    ipcMain.on('hide-window', () => {
-        if (mainWindow) mainWindow.hide();
+    ipcMain.on('hide-window', (event) => {
+        if (isPlayerSender(event)) hidePlayerWindow();
     });
 }
 
@@ -1403,7 +1416,7 @@ app.whenReady().then(() => {
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
-        else mainWindow.show();
+        else showPlayerWindow();
     });
 });
 

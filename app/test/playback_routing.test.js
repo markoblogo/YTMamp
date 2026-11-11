@@ -18,7 +18,10 @@ async function appFixture(t) {
     let bridgeOptions;
     const bounds = { x: 1000, y: 600, width: 360, height: 116 };
     let zoomFactor = 1;
+    let visible = true;
     const window = { getBounds: () => ({ ...bounds }),
+        isDestroyed: () => false, isVisible: () => visible,
+        hide: () => { visible = false; }, show: () => { visible = true; }, focus() {}, setAlwaysOnTop() {},
         setContentSize: (width, height) => Object.assign(bounds, { width, height }),
         setPosition: (x, y) => Object.assign(bounds, { x, y }),
         webContents: { send: (name, value) => messages.push({ name, value }), setZoomFactor: (value) => { zoomFactor = value; } } };
@@ -53,7 +56,7 @@ async function appFixture(t) {
         { id: 'b'.repeat(64), title: 'Second', artist: 'Music', relativePath: 'second.wav', filePath: path.join(dir, 'second.wav') }
     ] };
     vm.runInContext('localPlayer.setLibrary(testLibrary);', context);
-    return { context, messages, relayed, handlers, event, bridgeOptions, bounds, zoom: () => zoomFactor, directory: dir,
+    return { context, messages, relayed, handlers, event, bridgeOptions, bounds, zoom: () => zoomFactor, visible: () => visible, directory: dir,
         snapshot: () => JSON.parse(vm.runInContext('JSON.stringify({ source: activeSource, track: playerState.track, state: playerState.state })', context)) };
 }
 
@@ -108,4 +111,25 @@ test('player scaling persists, fits the display and does not reload audio when t
     assert.equal(JSON.parse(await fs.readFile(path.join(fixture.directory, 'settings.json'), 'utf8')).playerScale, 75);
     assert.equal(fixture.messages.filter((message) => message.name === 'local-audio-command').length, before);
     assert.equal(fixture.snapshot().track.title, 'First');
+});
+
+test('hide keeps local audio running; tray restore and YouTube auto-show respect explicit hiding', async (t) => {
+    const fixture = await appFixture(t);
+    vm.runInContext('localPlayer.receive({id:localPlayer.current.id,revision:localPlayer.revision,positionSec:1,durationSec:100,playing:true})', fixture.context);
+    const before = fixture.messages.filter((message) => message.name === 'local-audio-command').length;
+    const invalid = { ...fixture.event, senderFrame: { url: 'https://example.com' } };
+    fixture.handlers.get('hide-window')(invalid);
+    assert.equal(fixture.visible(), true);
+    fixture.handlers.get('hide-window')(fixture.event);
+    assert.equal(fixture.visible(), false);
+    assert.equal(fixture.snapshot().state.playing, true);
+    assert.equal(fixture.messages.filter((message) => message.name === 'local-audio-command').length, before);
+    vm.runInContext('toggleWindow()', fixture.context);
+    assert.equal(fixture.visible(), true);
+    fixture.handlers.get('set-source')(fixture.event, 'ytm');
+    fixture.handlers.get('hide-window')(fixture.event);
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'event', name: 'playingStarted' });
+    assert.equal(fixture.visible(), false, 'a new YouTube track does not undo an explicit hide');
+    fixture.bridgeOptions.onMessage({ v: 1, type: 'cmd', cmd: 'showWindow' });
+    assert.equal(fixture.visible(), true);
 });

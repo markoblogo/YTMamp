@@ -52,6 +52,12 @@ async function run(window) {
     await waitFor(() => report?.playing && report.positionSec > 0.1, 'tagged WAV playback');
     const revision = report.revision;
     const firstId = report.id;
+    const beforeHide = report.positionSec;
+    await evaluate('document.getElementById("hide-btn").click()');
+    await waitFor(() => !window.isVisible(), 'hide player window');
+    await waitFor(() => report?.playing && report.id === firstId && report.revision === revision && report.positionSec > beforeHide + 0.4, 'audio continues while hidden');
+    window.show();
+    await waitFor(() => window.isVisible(), 'show player window again');
     await evaluate('document.getElementById("open-folder").click()');
     await waitFor(async () => await idle() && await evaluate('document.querySelectorAll("#queue-tracks button").length === 3'), 'second folder');
     assert.equal(report.id, firstId); assert.equal(report.revision, revision);
@@ -65,6 +71,7 @@ async function run(window) {
     await waitFor(() => window.getContentBounds().height === 87 && window.getContentBounds().width === 270, '75 percent mini-player');
     assert.equal(window.webContents.getZoomFactor(), 0.75);
     await waitFor(() => evaluate('document.documentElement.scrollWidth <= 360'), 'scaled controls fit');
+    assert.equal(await evaluate('(() => { const area=document.getElementById("container").getBoundingClientRect(); return ["hide-btn","close-btn","queue-toggle","open-folder"].every(id => { const box=document.getElementById(id).getBoundingClientRect(); return box.width>0 && box.left>=area.left && box.right<=area.right; }); })()'), true, 'window controls remain visible at the smallest size');
     await evaluate('document.getElementById("queue-toggle").click()');
     await waitFor(() => window.getContentBounds().height === 420, 'reopen scaled library');
     Menu.getApplicationMenu().getMenuItemById('player-size-100').click();

@@ -246,6 +246,7 @@ volSlider.oninput = (e) => {
 };
 
 // --- UI Controls ---
+document.getElementById('hide-btn').onclick = () => window.electronAPI.hideWindow();
 document.getElementById('close-btn').onclick = () => {
     console.log('[DEBUG] CLICK close');
     window.electronAPI.quitApp();

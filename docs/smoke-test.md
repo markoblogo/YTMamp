@@ -49,3 +49,15 @@ Automated coverage is separate from the following owner checks:
 `npm run test:library:desktop` covers generated tagged WAV decoding, image decoding, multiple roots, accent-insensitive search, album playback boundaries, offline/reconnect and safe removal under Linux Xvfb. Unit tests cover restart, cancellation, containment, cache budgets and public catalog fields. A Mac CI check loads the real metadata worker and parser from the signed app's ASAR. These checks use generated music and temporary profiles, not the owner's collection.
 
 Observed on the owner's Apple Silicon Mac, 11 November 2026: the 0.6.0 development preview replaced the existing app through Finder and launched from the installed Applications folder without the previous damaged-app warning. The saved external-drive folder produced 165 tracks with tags and embedded covers; search narrowed the list, playback time advanced on an actual MP3, pause worked, and volume remained 31%. Album browsing exposed seven folder/tag groups. Listening quality, a physical drive disconnect and YouTube authentication were not claimed by this UI check. The first migration selection issue found during this check has a regression test; final preview validation is linked from PR #15.
+
+Follow-up verification, 11 November 2026: 75% (270 × 87), 100% (360 × 116), 125% (450 × 145) and 150% (540 × 174) mini-player layouts were observed on the Mac without clipped controls. The View menu's Larger action worked; automated input did not activate its increase shortcut, which is an input/shortcut observation rather than a confirmed application defect. COLLAPSE hid the library while the same local track continued from 02:30 to 02:44; Pause remained available. The owner then reported that everything appeared to work and accepted this pass. Multiple-root/restart/offline tests retain their automated status; no physical external drive was disconnected.
+
+## 0.6.1 hide-button pass
+
+- Click **_** during playback: the window disappears, the track keeps advancing and its identity/revision stays unchanged.
+- Restore using the menu-bar/tray icon or Dock: the same track, scale, query and album/folder view return.
+- **X** remains Quit and ends playback. Hiding and quitting are distinct actions with explicit tooltips.
+- At 75%, both window buttons and the library controls remain visible inside the header.
+- With YT selected, a new playingStarted event must not reopen a window explicitly hidden by the user. Explicit restore re-enables the normal show behavior.
+
+The Electron library smoke exercises real audio while hidden and restored. Routing tests cover sender validation, lack of pause/reload on hide, tray restoration and suppression of YouTube auto-show. Manual Mac observation is recorded separately from automated checks.
