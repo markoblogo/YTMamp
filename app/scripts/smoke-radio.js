@@ -58,10 +58,11 @@ async function run(window) {
     await waitFor(() => report?.playing && report.id !== id, 'next local station');
     assert.equal(await evaluate('document.getElementById("radio-frequency").textContent.startsWith("101.3 MHz")'), true);
     const stationAt101 = report.id;
+    const revisionAt101 = report.revision;
     await evaluate('document.getElementById("prev-btn").click()');
     await waitFor(() => evaluate('document.getElementById("radio-frequency").textContent.includes("SEEK")'), 'animated seek starts');
     await evaluate('document.getElementById("next-btn").click()');
-    await waitFor(() => report?.playing && report.id === stationAt101, 'new seek supersedes old seek');
+    await waitFor(() => report?.playing && report.id === stationAt101 && report.revision > revisionAt101, 'new seek supersedes old seek');
     assert.equal(await evaluate('document.getElementById("radio-frequency").textContent.startsWith("101.3 MHz")'), true);
     await evaluate('document.getElementById("radio-record").click()');
     await waitFor(() => record?.byteLength > 0, 'PCM worklet recording');
