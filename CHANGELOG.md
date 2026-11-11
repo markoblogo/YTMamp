@@ -110,3 +110,10 @@ All notable changes to this project will be documented in this file.
 - Auto-hide native YTM mini-player overlay.
 - System tray integration with visibility toggles.
 - Automated DMG and ZIP packaging for macOS.
+# 0.5.0 (unreleased)
+
+- Add stage 1 local folder playback, a local queue, seek/volume/shuffle/repeat and paused restoration of the last selected folder and track. Music is streamed in place.
+- Start in LOCAL mode and route controls/status through the selected source. Add an idempotent companion `pause` command for switching away from YouTube Music.
+- Add isolated Electron playback automation and an Apple Silicon preview artifact. Whole-computer audio discovery is excluded; multiple-folder library, metadata, radio and vinyl remain subsequent stages.
+- Update Electron to 44.11.1 and compatible locked transitive dependency patches to pass the high-severity dependency check.
+

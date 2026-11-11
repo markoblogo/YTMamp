@@ -1,6 +1,6 @@
 {
   "name": "ytmamp",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Retro mini-player for YouTube Music with a Chromium extension bridge.",
   "author": {
     "name": "markoblogo",
@@ -32,7 +32,7 @@
     "ws": "8.21.3"
   },
   "devDependencies": {
-    "electron": "44.3.0",
+    "electron": "44.11.1",
     "electron-builder": "26.15.3"
   },
   "build": {

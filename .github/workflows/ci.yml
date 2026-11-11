@@ -29,14 +29,6 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
-      - name: Resolve dependency patch updates
-        if: matrix.os == 'ubuntu-latest'
-        working-directory: app
-        run: |
-          npm install --package-lock-only --ignore-scripts --save-exact --save-dev electron@44.11.1
-          npm audit fix --package-lock-only --ignore-scripts --audit-level=high
-          node -e "for (const f of ['package.json', 'package-lock.json']) console.log('YTMAMP_LOCK_EXPORT:' + f + ':' + require('fs').readFileSync(f).toString('base64'))"
-
       - name: Install deps
         working-directory: app
         run: npm ci
@@ -56,6 +48,26 @@ jobs:
       - name: Package app
         working-directory: app
         run: npm run pack
+
+      - name: Build Apple Silicon preview
+        if: matrix.os == 'macos-latest'
+        working-directory: app
+        run: npm run dist:mac -- --arm64
+
+      - name: Bundle matching browser companion
+        if: matrix.os == 'macos-latest'
+        run: zip -r app/dist/YTMamp-0.5.0-extension.zip extension
+
+      - name: Upload Apple Silicon preview
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: YTMamp-stage1-macos-arm64
+          path: |
+            app/dist/YTMamp-0.5.0-mac.dmg
+            app/dist/YTMamp-0.5.0-mac.zip
+            app/dist/YTMamp-0.5.0-extension.zip
+          if-no-files-found: error
 
       - name: Local playback desktop smoke
         if: matrix.os == 'ubuntu-latest'

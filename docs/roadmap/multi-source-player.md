@@ -49,3 +49,5 @@ Before copying any module, verify the actual license file and file-level notices
 `npm run check`, `npm audit --audit-level=high` and `npm run pack` remain the release checks. `npm run test:desktop` adds a real Electron playback smoke using generated WAV files, muted output, isolated settings and a stubbed native folder picker. It verifies decoding, waveform data, seeking, queue controls, source switching and error handling without reading the owner's music. Linux CI runs it under Xvfb.
 
 The desktop automation does not replace the owner's macOS listening check. Before stage 1 is called release-ready, verify an actual music folder on the Mac, including YT source switching with the updated companion. Do not tag or merge solely because packaging succeeded.
+
+CI produces an unsigned Apple Silicon preview and matching v0.5.0 companion as `YTMamp-stage1-macos-arm64`. These are preview artifacts, not a tagged public release. The first Linux CI pass confirmed actual audio decoding, analyzer output and seeking; the final dependency lock and macOS package are checked again on the final branch revision.
