@@ -3,6 +3,10 @@ const { pathToFileURL } = require('node:url');
 const { LocalCollection } = require('./local_collection');
 const { createLocalMediaHandler } = require('./local_media');
 const { LocalPlayer } = require('./local_player');
+const { RadioLibrary } = require('./radio_library');
+const { RadioPlayer } = require('./radio_player');
+const { RadioRecorder } = require('./radio_recorder');
+const { createRadioMediaHandler } = require('./radio_network');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'ytmamp-media', privileges: {
     standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true
@@ -47,6 +51,14 @@ let hiddenByUser = false;
 let collection;
 let collectionReady;
 let choosingFolder = false;
+let radioLibrary;
+let radioPlayer;
+let radioRecorder;
+let radioSaving = false;
+let radioQuitAccepted = false;
+let radioQuitPrompt = false;
+let radioActionBusy = false;
+let radioLocationPermissionUntil = 0;
 const localPlayer = new LocalPlayer();
 const pluginRuntimeStatusQueue = [];
 const pluginRuntimeUiQueue = [];
@@ -717,7 +729,8 @@ let settings = {
     localFolder: '',
     localTrackId: '',
     localVolume: 0.5,
-    playerScale: 100
+    playerScale: 100,
+    radioVolume: 0.5
 };
 
 function loadSettings() {
@@ -1002,6 +1015,12 @@ function createWindow() {
 
     applyPlayerLayout();
     mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    mainWindow.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
+        callback(contents === mainWindow.webContents && permission === 'geolocation' && details.isMainFrame &&
+            details.requestingUrl === pathToFileURL(path.join(__dirname, '../renderer/index.html')).href && Date.now() < radioLocationPermissionUntil);
+    });
+    mainWindow.webContents.session.setPermissionCheckHandler((contents, permission) =>
+        contents === mainWindow.webContents && permission === 'geolocation' && Date.now() < radioLocationPermissionUntil);
     mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
     mainWindow.webContents.on('context-menu', () => {
         Menu.buildFromTemplate([{ label: 'Player size', submenu: playerSizeItems() }]).popup({ window: mainWindow });
@@ -1011,6 +1030,8 @@ function createWindow() {
     mainWindow.webContents.on('did-finish-load', () => {
         mainWindow.webContents.send('source-change', activeSource);
         mainWindow.webContents.send('local-catalog', localPlayer.catalog());
+        radioPlayer?.publish();
+        radioRecorder?.publish();
         if (folderScan) sendFolderNotice('Reading music folders and tags...', true);
         if (activeSource === 'local') {
             // Restoring a window never starts audio by itself.
@@ -1065,7 +1086,8 @@ function updateTrayMenu() {
         { label: 'Refresh music library', click: () => changeCollection() },
         { label: 'Playback source', submenu: [
             { label: 'Local files', type: 'radio', checked: activeSource === 'local', click: () => setPlaybackSource('local') },
-            { label: 'YouTube Music', type: 'radio', checked: activeSource === 'ytm', click: () => setPlaybackSource('ytm') }
+            { label: 'YouTube Music', type: 'radio', checked: activeSource === 'ytm', click: () => setPlaybackSource('ytm') },
+            { label: 'Radio', type: 'radio', checked: activeSource === 'radio', click: () => setPlaybackSource('radio') }
         ] },
         {
             label: 'Copy bridge token',
@@ -1222,23 +1244,28 @@ function setupWebSocket() {
 
 function sendPlayerCommand(command) {
     if (activeSource === 'local') return localPlayer.command(command);
+    if (activeSource === 'radio') return radioPlayer.command(command);
     return !!(bridge && bridge.relayCommand(command));
 }
 
 function setPlaybackSource(source) {
-    if (!['local', 'ytm'].includes(source) || source === activeSource) return;
+    if (!['local', 'ytm', 'radio'].includes(source) || source === activeSource) return;
     if (activeSource === 'local') localPlayer.pause();
-    else if (ytmSnapshot.state?.playing && bridge) {
+    else if (activeSource === 'radio') {
+        radioPlayer.pause();
+        if (radioRecorder.recording) { radioRecorder.stop(); saveRadioRecording().catch(() => radioRecorder.publish('Recording is unsaved. Open RADIO / LIBRARY to save it.')); }
+    } else if (ytmSnapshot.state?.playing && bridge) {
         bridge.relayCommand({ v: 1, type: 'cmd', cmd: 'pause', id: `source-${Date.now()}` });
     }
     activeSource = source;
-    appStatus = source === 'local' ? 'LOCAL' : ytmStatus;
+    appStatus = source === 'local' ? 'LOCAL' : source === 'radio' ? 'RADIO' : ytmStatus;
     if (mainWindow) {
         mainWindow.webContents.send('source-change', source);
         mainWindow.webContents.send('status-change', appStatus);
         mainWindow.webContents.send('wave-update', { type: 'waveFallback', reason: 'Source changed' });
     }
     if (source === 'local') localPlayer.publish();
+    else if (source === 'radio') radioPlayer.publish();
     else {
         publishPlayerEvent('track', ytmSnapshot.track ? sanitizeTrackMessage(ytmSnapshot.track) : null, { dedupeMs: 0 });
         publishState(ytmSnapshot.state || { playing: false });
@@ -1310,12 +1337,23 @@ async function chooseMusicFolder() {
 
 function setupLocalPlayback() {
     collection = new LocalCollection({ directory: app.getPath('userData') });
+    radioLibrary = new RadioLibrary({ directory: app.getPath('userData') });
+    radioPlayer = new RadioPlayer({ library: radioLibrary, volume: Number.isFinite(settings.radioVolume) ? Math.max(0, Math.min(1, settings.radioVolume)) : 0.5 });
+    radioRecorder = new RadioRecorder({ directory: app.getPath('userData') });
+    radioPlayer.on('audio', (command) => mainWindow?.webContents.send('radio-audio-command', command));
+    radioPlayer.on('selection', (value) => mainWindow?.webContents.send('radio-selection', value));
+    radioPlayer.on('track', (track) => { if (activeSource === 'radio') publishPlayerEvent('track', track, { dedupeMs: 0 }); });
+    radioPlayer.on('state', (state) => { if (activeSource === 'radio') publishState(state); });
+    radioPlayer.on('volume', (volume) => { settings.radioVolume = volume; saveSettings(); });
+    radioRecorder.on('status', (state) => mainWindow?.webContents.send('radio-recording', state));
     localPlayer.volume = Number.isFinite(settings.localVolume) ? Math.max(0, Math.min(1, settings.localVolume)) : 0.5;
-    protocol.handle('ytmamp-media', createLocalMediaHandler((id, kind) => {
+    const localMedia = createLocalMediaHandler((id, kind) => {
         if (kind === 'art') return collection.artwork(id);
         const item = localPlayer.library.tracks.find((track) => track.id === id && track.available !== false);
         return item ? { ...item, root: item.root || localPlayer.library.root } : null;
-    }));
+    });
+    const radioMedia = createRadioMediaHandler((id) => radioLibrary.stations.get(id));
+    protocol.handle('ytmamp-media', (request) => /^ytmamp-media:\/\/radio(?:-art)?\//.test(request.url) ? radioMedia(request) : localMedia(request));
     localPlayer.on('audio', (command) => mainWindow?.webContents.send('local-audio-command', command));
     localPlayer.on('catalog', (catalog) => mainWindow?.webContents.send('local-catalog', catalog));
     localPlayer.on('selection', (selection) => {
@@ -1337,7 +1375,63 @@ function isPlayerSender(event) {
         event.senderFrame?.url === pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
 }
 
+async function saveRadioRecording() {
+    if (radioSaving || !radioRecorder.pending) return;
+    radioSaving = true;
+    try {
+        const pending = radioRecorder.pending;
+        const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const result = await dialog.showSaveDialog(mainWindow, { title: 'Save radio recording', defaultPath: pending.name + ' ' + date + '.wav', filters: [{ name: 'WAV audio', extensions: ['wav'] }], properties: ['showOverwriteConfirmation'] });
+        if (!result.canceled && result.filePath) await radioRecorder.save(result.filePath);
+        else radioRecorder.publish('Recording kept. Use Save as or Discard in RADIO / LIBRARY.');
+    } finally { radioSaving = false; }
+}
+
+async function radioAction(event, action, data = {}) {
+    if (!isPlayerSender(event) || typeof action !== 'string' || !data || typeof data !== 'object') return { error: 'Invalid radio request.' };
+    try {
+        if (action === 'snapshot') return radioLibrary.snapshot();
+        if (action === 'search') return await radioLibrary.search(data);
+        if (action === 'device-location') { radioLocationPermissionUntil = Date.now() + 15000; return { ok: true }; }
+        if (action === 'location') {
+            if (radioActionBusy) return { error: 'Location lookup is already running.' };
+            radioActionBusy = true;
+            try { const result = await radioLibrary.chooseLocation(data); radioPlayer.publish(); return result; } finally { radioActionBusy = false; }
+        }
+        if (action === 'custom') return { id: radioLibrary.addCustom(data) };
+        if (action === 'favorite') { radioLibrary.toggleFavorite(data.id); radioPlayer.publish(); return { ok: true }; }
+        if (action === 'frequency') { radioLibrary.setFrequency(data.id, data.value); radioPlayer.publish(); return { ok: true }; }
+        if (action === 'play' || action === 'tune') {
+            if (activeSource !== 'radio') return { error: 'Select RADIO first.' };
+            if (action === 'tune' && !radioLibrary.local().some((station) => station.id === data.id)) return { error: 'Not a local FM station.' };
+            if (!radioPlayer.select(data.id, { tuning: action === 'tune' })) return { error: 'Search for this station again.' };
+            if (action === 'play') radioLibrary.browser.click(radioPlayer.current.uuid);
+            return { ok: true };
+        }
+        if (action === 'record') {
+            if (data.action === 'start') {
+                if (activeSource !== 'radio' || !radioPlayer.state.playing) return { error: 'Start radio playback before recording.' };
+                radioRecorder.start(radioPlayer.current?.name);
+            } else if (data.action === 'pause') radioRecorder.togglePause();
+            else if (data.action === 'stop') { radioRecorder.stop(); await saveRadioRecording(); }
+            else if (data.action === 'save') await saveRadioRecording();
+            else if (data.action === 'discard' && !radioSaving) radioRecorder.discard();
+            else return { error: 'Invalid recording action.' };
+            return radioRecorder.status();
+        }
+        return { error: 'Unknown radio request.' };
+    } catch (error) { return { error: String(error.message || 'Radio request failed.').slice(0, 200) }; }
+}
+
 function setupIpc() {
+    ipcMain.handle('radio-action', radioAction);
+    ipcMain.on('radio-audio-report', (event, report) => { if (isPlayerSender(event) && activeSource === 'radio') radioPlayer.receive(report); });
+    let lastRecordingStatus = 0;
+    ipcMain.on('radio-record-chunk', (event, data) => {
+        if (!isPlayerSender(event) || activeSource !== 'radio') return;
+        radioRecorder.chunk(data);
+        if (Date.now() - lastRecordingStatus >= 1000) { lastRecordingStatus = Date.now(); radioRecorder.publish(); }
+    });
     ipcMain.on('send-command', (event, command) => {
         if (!isPlayerSender(event) || !validateMessage(command)) {
             console.warn('[Main] Dropping invalid renderer command');
@@ -1424,8 +1518,21 @@ app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+    if (!radioQuitAccepted && (radioRecorder?.recording || radioRecorder?.pending)) {
+        event.preventDefault();
+        if (!radioQuitPrompt) {
+            radioQuitPrompt = true;
+            radioRecorder.stop();
+            saveRadioRecording().then(() => {
+                if (!radioRecorder.pending) { radioQuitAccepted = true; app.quit(); }
+                else { isQuitting = false; showPlayerWindow(); }
+            }).catch(() => { isQuitting = false; showPlayerWindow(); }).finally(() => { radioQuitPrompt = false; });
+        }
+        return;
+    }
     isQuitting = true;
+    radioPlayer?.close();
     if (folderScan) folderScan.abort();
     collection?.close();
     if (lastfmScrobbler) {

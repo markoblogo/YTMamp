@@ -15,6 +15,7 @@
             <select id="source-select" aria-label="Playback source">
                 <option value="local">LOCAL</option>
                 <option value="ytm">YT MUSIC</option>
+                <option value="radio">RADIO</option>
             </select>
             <button id="open-folder" title="Add music folders" aria-label="Add music folders">ADD</button>
             <button id="queue-toggle" aria-label="Open music library" aria-expanded="false" aria-controls="local-queue">LIBRARY</button>
@@ -44,6 +45,11 @@
                     <div id="progress-fill"></div>
                     <input type="range" id="progress-bar" aria-label="Track position" min="0" max="100" value="0">
                 </div>
+                <div id="radio-tuner" hidden>
+                    <div id="radio-frequency">FM / choose location in LIBRARY</div>
+                    <input id="radio-dial" type="range" min="87.5" max="108" step="0.1" value="87.5" aria-label="Tune local FM stations" disabled>
+                    <div class="dial-labels"><span>88</span><span>94</span><span>100</span><span>108 MHz</span></div>
+                </div>
             </div>
         </div>
 
@@ -55,6 +61,11 @@
                 <button id="like-btn" class="mini-btn" title="Like">Like</button>
                 <button id="shuffle-btn" class="mini-btn" title="Shuffle">Shuf</button>
                 <button id="repeat-btn" class="mini-btn" title="Repeat">Rep</button>
+                <span id="radio-record-controls" hidden>
+                    <button id="radio-record" title="Record radio to WAV" aria-label="Start radio recording">REC</button>
+                    <button id="radio-record-pause" title="Pause recording, keep listening" aria-label="Pause radio recording" disabled>II</button>
+                    <button id="radio-record-stop" title="Stop recording and Save as" aria-label="Stop recording and save" disabled>STOP</button>
+                </span>
             </div>
             <div id="volume-container">
                 <span id="volume-label">VOL</span>
@@ -96,10 +107,44 @@
             <button id="queue-more" hidden>Show more</button>
         </div>
     </section>
+    <section id="radio-library" aria-label="Radio library" hidden>
+        <form id="radio-search-form" class="radio-toolbar">
+            <input id="radio-search" type="search" placeholder="Station name" aria-label="Search radio station name" maxlength="200">
+            <button type="submit">Search</button>
+            <button id="radio-collapse" type="button">Collapse</button>
+        </form>
+        <div class="radio-filters">
+            <input id="radio-genre" placeholder="Genre" aria-label="Radio genre" maxlength="100">
+            <input id="radio-language" placeholder="Language" aria-label="Radio language" maxlength="100">
+            <input id="radio-country" placeholder="Country code: FR" aria-label="Radio country ISO code" maxlength="2">
+            <input id="radio-region" placeholder="Region" aria-label="Radio region" maxlength="100">
+            <select id="radio-sort" aria-label="Sort radio stations"><option value="name">Name</option><option value="genre">Genre</option><option value="language">Language</option><option value="country">Country</option><option value="region">Region</option></select>
+        </div>
+        <div class="radio-toolbar">
+            <button id="radio-all" aria-pressed="true">All stations</button><button id="radio-favorites" aria-pressed="false">Favorites</button><button id="radio-local" aria-pressed="false">Local FM</button>
+            <button id="radio-retry">Retry stream</button>
+            <label><input type="checkbox" id="radio-noise" checked> Tuning noise</label>
+            <span id="radio-record-status" role="status"></span>
+        </div>
+        <details id="radio-settings">
+            <summary>Location, local frequencies and custom streams</summary>
+            <form id="radio-location-form" class="radio-toolbar">
+                <input id="radio-city" placeholder="City for local stations" aria-label="Radio location city" maxlength="120"><button type="submit">Find city</button><button id="radio-locate" type="button">Use device location</button>
+            </form>
+            <div class="radio-toolbar"><select id="radio-places" aria-label="Choose radio location"></select><button id="radio-place-use">Use this location</button><span id="radio-location-label">Location not set</span></div>
+            <form id="radio-custom-form" class="radio-toolbar"><input id="radio-custom-name" placeholder="Station name" aria-label="Custom station name" maxlength="200" required><input id="radio-custom-url" placeholder="https://… direct audio stream" type="url" aria-label="Custom station stream URL" maxlength="4096" required><button type="submit">Add stream</button></form>
+            <p>FM shows local stations with a supplied frequency, within 60 km. Coverage is incomplete. Use “Set local FM” on a card to enter an actual local frequency. Online-only stations stay in the catalog. City search: Open-Meteo / GeoNames.</p>
+        </details>
+        <p id="radio-notice" role="status">Search the worldwide Radio Browser directory, or choose a location for local FM.</p>
+        <div id="radio-results"><div id="radio-grid"></div><button id="radio-more" hidden>More stations</button></div>
+        <div id="radio-pending" hidden><span>Unsaved recording</span><button id="radio-save">Save as…</button><button id="radio-discard">Discard</button></div>
+    </section>
     <script src="renderer.js"></script>
     <script src="library_view.js"></script>
     <script src="library_ui.js"></script>
     <script src="local_audio.js"></script>
+    <script src="radio_audio.js"></script>
+    <script src="radio_ui.js"></script>
 </body>
 
 </html>

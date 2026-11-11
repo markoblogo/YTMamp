@@ -27,12 +27,15 @@
     }
     function setVisible(value) {
         visible = value;
-        $('local-queue').hidden = !value;
+        $('local-queue').hidden = !value || source !== 'local';
+        $('radio-library').hidden = !value || source !== 'radio';
         $('queue-toggle').setAttribute('aria-expanded', String(value));
-        $('queue-toggle').setAttribute('aria-label', value ? 'Collapse music library' : 'Open music library');
+        $('queue-toggle').setAttribute('aria-label', value ? 'Collapse library' : 'Open library');
+        $('queue-toggle').setAttribute('aria-controls', source === 'radio' ? 'radio-library' : 'local-queue');
         api.setQueueVisible(value);
-        if (value) $('library-search').focus();
+        if (value) $(source === 'radio' ? 'radio-search' : 'library-search').focus();
     }
+    window.setLibraryVisible = setVisible;
     function updateSelection() {
         for (const button of $('queue-tracks').querySelectorAll('button')) {
             button.setAttribute('aria-current', String(button.dataset.id === selection));
@@ -122,7 +125,7 @@
     $('library-refresh').addEventListener('click', () => api.refreshLibrary());
     $('queue-more').addEventListener('click', appendResults);
     $('cancel-scan').addEventListener('click', () => api.cancelFolderScan());
-    api.onSourceChange((value) => { source = value; $('source-select').value = value; updateSelection(); });
+    api.onSourceChange((value) => { source = value; $('source-select').value = value; $('queue-toggle').disabled = value === 'ytm'; $('open-folder').hidden = value !== 'local'; setVisible(visible && value !== 'ytm'); updateSelection(); });
     api.onLocalCatalog((catalog) => {
         tracks = catalog.tracks; roots = catalog.roots || [];
         if (albumId && !tracks.some((track) => track.albumId === albumId)) albumId = '';

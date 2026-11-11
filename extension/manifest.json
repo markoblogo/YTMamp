@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YTMamp",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Companion bridge for the YTMamp desktop mini-player.",
   "background": {
     "service_worker": "src/background.js"

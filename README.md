@@ -16,6 +16,9 @@ Local playback is being introduced in a staged development branch. The published
 ## What it does
 
 - Add several music folders and their subfolders without copying audio. **ADD** opens the folder picker; **LIBRARY** shows tracks, albums and search. Local playback works without a browser or internet connection.
+- Select **RADIO** in the same source switch. **LIBRARY** opens station logo cards, worldwide name/genre/language/country/region search, sorting, favorites and custom HTTP(S) streams. Direct MP3/AAC/OGG and other Electron-supported streams play online; HLS streams currently report an unsupported-stream message.
+- In RADIO the progress strip becomes a retro FM dial. Prev/Next tune only nearby stations with a supplied FM frequency. Choose a city or request device location in the library. Frequency data is incomplete and community supplied; known local frequencies can be entered on station cards. Internet-only stations remain available in the full catalog. Short tuning noise can be switched off.
+- **REC**, **II** and **STOP** record radio independently of playback. STOP opens the native Save As dialog for stereo 48 kHz/16-bit WAV. Cancel keeps the recording available for Save As or Discard. Pausing a recording excludes that interval while the station keeps playing.
 - Collapse the library with **COLLAPSE** or the **LIBRARY** toggle; reopening keeps its search and album selection without interrupting playback.
 - Choose **Player size** from a right click, the tray menu or **View**: 75%, 100%, 125% or 150%. The size is saved; 75% gives a 270 × 87 mini-player. Cmd/Ctrl `-`, `=` and `0` also change/reset size.
 - Use **_** to hide the player and keep music playing. Restore it from the menu-bar/tray icon or the Dock. **X** quits the app and stops playback. Explicit hiding also suppresses YouTube auto-show until you bring the player back.
@@ -60,6 +63,10 @@ If the extension reports a missing receiver after an update, refresh the YouTube
 ## Privacy and network access
 
 The desktop bridge and HTTP API listen on the local machine by default. The extension runs only on `music.youtube.com` and stores its bridge token in the browser profile. Last.fm is disabled unless credentials are configured.
+
+Radio contacts the public Radio Browser directory for searches and a click counter on explicit station playback; audio and logos come from station servers, which see your IP address. City search uses [Open-Meteo](https://open-meteo.com/en/docs/geocoding-api) / [GeoNames](https://www.geonames.org/) (CC BY 4.0 data). Device location is requested only when you choose it; a rounded location is saved locally and can be replaced by a manually selected city. There is no automatic IP geolocation. Local FM is a 60 km proximity list of supplied coordinates/frequencies, not a real reception map. It may be empty or incomplete.
+
+WAV recording uses about 11 MiB per minute, streams to a private temporary file and never buffers a whole recording in RAM. A session stops at 512 MiB or when less than 256 MiB is free; Save As can target an external drive. Canceled saves retain the temporary recording until it is saved or discarded. Switching away from RADIO stops recording and prompts to save. Quitting also prompts if a recording is unsaved. This preview has no MP3 encoder and no recovery UI for a forced app/system termination.
 
 LAN integrations are opt-in. Setting `INTEGRATION_HOST` to a non-loopback address requires `INTEGRATION_TOKEN`; browser controllers also require an explicit `CAST_ORIGIN_ALLOWLIST`. See the [integration API](docs/integration-api.md) and [bridge protocol](docs/protocol.md).
 

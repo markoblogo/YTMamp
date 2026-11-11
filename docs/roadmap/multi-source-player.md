@@ -29,13 +29,26 @@ Owner UI requirement, 11 November 2026: keep the transport as the compact mini-p
 
 ## Radio requirements for the next stage
 
+The owner combined radio and the pending hide button into one 0.7.0 installation/test pass. Stop after that pass and review before starting YouTube embedding or vinyl.
+
+- One LOCAL / YT MUSIC / RADIO source switch. The existing LIBRARY button opens the corresponding music or radio panel; COLLAPSE keeps playback running. No extra permanent catalog button.
+- RADIO retains the waveform and volume, gives the mini-player a warm receiver face, and replaces track progress/duration with FM tuning. Prev/Next and the dial select only local stations in frequency order. A globally searched internet-only station can still play/pause in the mini-player, but never enters the local dial merely because it is playing.
+- Worldwide station cards/search cover terrestrial streams and internet-only stations. Filters combine name, genre, language, ISO country and region; sort uses those same fields. Favorites and custom direct streams are saved independently of directory availability.
+- Radio Browser has no separate transmitter-frequency field. The initial dial uses explicit FM/MHz labels plus station coordinates within 60 km, or frequencies the owner assigns to a station at the selected location. These are supplied metadata, not verified reception coverage. No invented station frequency or automatic classification from an unlabelled number. Initial band coverage is FM only, and the local list can be incomplete or empty. An authoritative transmitter-data provider remains an enhancement.
+- Location is requested explicitly, with manual worldwide city search as fallback. The city geocoder is Open-Meteo/GeoNames. Device coordinates are rounded before local persistence. No IP-based location lookup or background location tracking.
+- REC / recording pause / STOP act independently of listening. Capture is stereo 48 kHz / 16-bit PCM WAV, streamed to a bounded private temporary file. STOP opens Save As, including external destinations. Cancel retains the pending file; Save As and Discard remain in the radio library. Source changes and normal quit prompt to save. A forced termination currently leaves the private temp file without recovery UI.
+- Short, volume-scaled tuning static is optional and kept outside the recording signal path. Recording is bounded at 512 MiB with a 256 MiB free-space reserve; no full-session RAM buffer or audio copies from the local collection.
+- Direct streams use a controlled media protocol. Public HTTP(S) destinations only; DNS answers are checked and pinned per redirect. No renderer network access or general filesystem bridge is added. Initial decoder support follows Electron; HLS is explicitly unsupported rather than silently treated as MP3.
+
+Implementation and generated-audio tests are in the radio branch. CI packaging and native Mac acceptance must be recorded separately before this pass is considered complete.
+
 - A collapsible station panel using a grid of logos, visually analogous to album cards, with a fallback when a station has no usable logo.
 - Search/filter by station name, music genre, broadcast language and country/region, with combinable filters and clear/reset controls.
 - Sorting by name, genre, language and region. Unknown metadata must remain visibly unspecified rather than inferred.
 - Keep the compact transport and scaling behavior. Source switching must stop the outgoing source so stations and local tracks do not play together.
 - Add favorites, custom stream URLs and recovery/error feedback as planned for stage 3.
 
-Suggested radio passes, each followed by a stop: (1) source/directory verification and station catalogue with cards, search and sorting; (2) playback, source switching, favorites and reconnect handling; (3) Mac acceptance checks and fixes. The exact first radio pass is agreed after the hide-button pass is reviewed.
+The owner requested one combined radio build and installation, followed by a test/review stop, instead of several small installations.
 
 ## Candidate donors reviewed
 

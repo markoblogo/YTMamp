@@ -29,3 +29,5 @@ Popup-to-app commands are `showWindow` and `hideWindow`.
 The extension reports `Client connected`, `Need YTM Tab`, `OFFLINE`, or `WAITING`. When no YouTube Music tab is connected, the renderer clears stale track state.
 
 The app validates protocol version, message types, commands, numeric ranges, and waveform payload size. Track titles and artists are trimmed and limited to 300 characters before renderer IPC.
+
+The 0.7.0 development preview also has RADIO. Radio commands are handled in the desktop app, never forwarded to the YouTube companion. Play/pause starts/stops the selected online stream, Prev/Next select only the local FM queue, and Like toggles a station favorite. Seek/shuffle/repeat have no radio operation. Recording and location use sender-checked desktop IPC and are not exposed by the browser bridge.

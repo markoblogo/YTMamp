@@ -30,7 +30,7 @@ async function appFixture(t) {
         protocol: { registerSchemesAsPrivileged() {}, handle() {} },
         screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1200, height: 700 } }) },
         Menu: { buildFromTemplate: (items) => items, setApplicationMenu() {} },
-        ipcMain: { on: (name, callback) => handlers.set(name, callback) }
+        ipcMain: { on: (name, callback) => handlers.set(name, callback), handle: (name, callback) => handlers.set(name, callback) }
     };
     const context = vm.createContext({
         console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },

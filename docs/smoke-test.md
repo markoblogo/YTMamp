@@ -61,3 +61,20 @@ Follow-up verification, 11 November 2026: 75% (270 × 87), 100% (360 × 116), 12
 - With YT selected, a new playingStarted event must not reopen a window explicitly hidden by the user. Explicit restore re-enables the normal show behavior.
 
 The Electron library smoke exercises real audio while hidden and restored. Routing tests cover sender validation, lack of pause/reload on hide, tray restoration and suppression of YouTube auto-show. Manual Mac observation is recorded separately from automated checks.
+
+## 0.7.0 radio and recording pass
+
+Local focused tests validate public URL restrictions, explicit frequency parsing, directory query/cache/favorites, geographical/frequency ordering, exclusion of internet-only stations from the dial, stale reports, recording pause/resume and PCM WAV headers/samples. Existing local playback/routing tests remain required.
+
+`npm run test:radio:desktop` uses generated audio and an isolated profile. It stubs transport only within the test process; production has no private-network exception. The test checks RADIO selection, the same LIBRARY toggle, station cards, local frequency order, real decoding/analyzer data, Prev/Next, worklet capture, pause without stopping listening, WAV save, hide/collapse, compact layout at four scales and return to LOCAL. This does not establish real Radio Browser availability or native macOS permissions.
+
+Native acceptance checklist:
+
+1. Install the signed 0.7.0 preview, retaining local folders/settings. Launch LOCAL paused, then select RADIO from the same switch.
+2. LIBRARY opens radio cards. Search a real station, combine genre/language/country/region filters, sort and favorite it. Check a failed stream and retry. Test an online-only stream as well as a terrestrial station's online stream.
+3. Choose the actual city or request device location. Inspect supplied local FM frequencies, assign a known frequency if needed, and check Prev/Next and dial use only the local list. No supplied local data must produce a clear empty state. Device geolocation depends on platform/provider availability; manual city selection must remain usable.
+4. Check waveform and volume, optional short tuning noise, 75/100/125/150% sizes, collapse/reopen, explicit hide and Dock/tray restore while audio keeps playing.
+5. Record, pause only the recording, resume and STOP. Save WAV to an external drive and play it back. Cancel Save As and then save/discard from the panel. Switch away during recording and try normal quit with a pending recording.
+6. Return to LOCAL and verify the collection/selected track are preserved, the stream stops, and local playback still works. Do not claim physical-drive disconnect, YouTube authentication, verified FM coverage or listening quality from an automated fixture.
+
+CI and native Mac outcomes are pending for this branch. The installed 0.6.0 app remains the accepted fallback until the combined build is verified.

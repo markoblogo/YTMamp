@@ -28,9 +28,9 @@ window.electronAPI.onStatusChange((status) => {
     const statusUpper = status.toUpperCase();
 
     led.className = ''; // reset
-    if (statusUpper === 'LOCAL') {
+    if (statusUpper === 'LOCAL' || statusUpper === 'RADIO') {
         led.classList.add('connected');
-        led.title = 'Local music (works offline)';
+        led.title = statusUpper === 'RADIO' ? 'Online radio' : 'Local music (works offline)';
     } else if (statusUpper.includes('CONNECTED')) {
         led.classList.add('connected');
         led.title = 'Connected';
@@ -130,7 +130,7 @@ window.electronAPI.onWaveUpdate((msg) => {
 });
 
 function draw() {
-    const localWave = window.readLocalWave?.();
+    const localWave = window.readLocalWave?.() || window.readRadioWave?.();
     if (localWave) {
         lastWaveData = localWave;
         lastWaveTime = Date.now();

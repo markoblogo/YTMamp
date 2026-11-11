@@ -1,6 +1,6 @@
 {
   "name": "ytmamp",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Retro mini-player for YouTube Music with a Chromium extension bridge.",
   "author": {
     "name": "markoblogo",
@@ -26,6 +26,7 @@
     "test:smoke": "node --test test/integration_api_smoke.test.js",
     "test:desktop": "electron scripts/smoke-local-playback.js",
     "test:library:desktop": "electron scripts/smoke-library.js",
+    "test:radio:desktop": "electron scripts/smoke-radio.js",
     "check": "npm run lint && npm test",
     "pack": "npm run clean && electron-builder --dir --publish never"
   },
@@ -45,6 +46,9 @@
       "buildResources": "assets"
     },
     "mac": {
+      "extendInfo": {
+        "NSLocationUsageDescription": "Find nearby radio stations for the local FM dial when you choose Use device location."
+      },
       "identity": "-",
       "target": [
         "dmg",
