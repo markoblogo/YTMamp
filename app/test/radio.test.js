@@ -79,6 +79,21 @@ test('radio next/prev use the local frequency queue even while an online-only st
     player.command({ cmd: 'playPause' }); assert.ok(player.revision > old); assert.equal(player.command({ cmd: 'seek', valueSec: 12 }), false);
     assert.equal(player.state.durationSec, 0); assert.equal(player.state.positionSec, 0);
 });
+
+test('a failed station address switches to a compatible alternate and rejects old playback reports', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { library } = fixture(t);
+    const a = stationFrom(raw('FIP', 'https://example.org/first', { codec: 'AAC' }));
+    const b = stationFrom(raw('Fip', 'https://example.org/second', { codec: 'MP3' }));
+    library.stations.set(a.id, a); library.stations.set(b.id, b);
+    const player = new RadioPlayer({ library }); t.after(() => player.close());
+    player.select(a.id); const oldRevision = player.revision;
+    player.receive({ id: a.id, revision: oldRevision, playing: false, error: true });
+    assert.equal(library.failed.has(a.id), true);
+    t.mock.timers.tick(1000);
+    assert.equal(player.id, b.id); assert.ok(player.revision > oldRevision);
+    assert.equal(player.receive({ id: a.id, revision: oldRevision, playing: true }), false);
+});
 test('recording writes bounded stereo PCM WAV, pause excludes samples, Save copies a finalized file', async (t) => {
     const { directory } = fixture(t); const recorder = new RadioRecorder({ directory });
     recorder.start('Jazz / FM');

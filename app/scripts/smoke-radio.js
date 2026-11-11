@@ -57,6 +57,12 @@ async function run(window) {
     await evaluate('document.getElementById("next-btn").click()');
     await waitFor(() => report?.playing && report.id !== id, 'next local station');
     assert.equal(await evaluate('document.getElementById("radio-frequency").textContent.startsWith("101.3 MHz")'), true);
+    const stationAt101 = report.id;
+    await evaluate('document.getElementById("prev-btn").click()');
+    await waitFor(() => evaluate('document.getElementById("radio-frequency").textContent.includes("SEEK")'), 'animated seek starts');
+    await evaluate('document.getElementById("next-btn").click()');
+    await waitFor(() => report?.playing && report.id === stationAt101, 'new seek supersedes old seek');
+    assert.equal(await evaluate('document.getElementById("radio-frequency").textContent.startsWith("101.3 MHz")'), true);
     await evaluate('document.getElementById("radio-record").click()');
     await waitFor(() => record?.byteLength > 0, 'PCM worklet recording');
     const bytesBefore = fs.statSync(fs.readdirSync(temporary).filter((name) => /^radio-recording-[a-f0-9]{24}\.wav$/.test(name)).map((name) => path.join(temporary, name))[0]).size;

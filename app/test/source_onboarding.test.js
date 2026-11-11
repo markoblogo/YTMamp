@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const { createYtmLauncher } = require('../src/main/ytm_launcher');
 const { locateMac } = require('../src/main/device_location');
 test('YouTube opens the default browser only when disconnected and avoids repeated opens', async () => {
@@ -16,7 +17,7 @@ test('native location returns rounded coordinates and OS-derived country, withou
         request = { file, args, options };
         callback(null, JSON.stringify({ lat: 47.21682, lon: -1.55413, label: 'Nantes', countrycode: 'fr' }));
     } });
-    assert.equal(request.file, '/app/Resources/native/ytmamp-location'); assert.deepEqual(request.args, []);
+    assert.equal(request.file, path.join('/app/Resources', 'native/ytmamp-location')); assert.deepEqual(request.args, []);
     assert.ok(request.options.timeout <= 30000); assert.equal(result.lat, 47.22); assert.equal(result.lon, -1.55); assert.equal(result.countrycode, 'FR');
 });
 test('native permission denial and invalid coordinates remain actionable errors', async () => {
