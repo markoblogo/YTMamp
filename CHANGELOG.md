@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - Unreleased development preview
+
+### Added
+- Persistent library from several explicitly selected music folders, including nested folders and external drives; overlapping selections do not duplicate tracks.
+- Read-only embedded metadata through the MIT-licensed `music-metadata` parser in a bounded worker, with filename/folder fallbacks.
+- Embedded and folder cover art, album browsing, disc/track ordering and album-scoped playback queues.
+- Accent-insensitive collection search and a folder filter in an expandable library window.
+- Refresh, cancel, safe folder removal and cached offline albums that return after reconnecting and refreshing.
+- Generated tagged-audio tests, an Electron library smoke and a signed Mac package worker-loading check.
+
+### Changed
+- Migrate the stage 1 music folder automatically; retain the paused startup behavior and preserve playback while updating the library.
+- Bound metadata and artwork storage without copying music or searching the whole computer.
+
+## [0.5.0] - Unreleased development preview
+
+### Added
+- Local folder playback and queue, local startup mode and switching to the existing YouTube Music browser companion.
+- Sandboxed media streaming with seeking, local waveform, saved folder/track/volume and an isolated Electron playback smoke.
+- Ad-hoc signed Apple Silicon previews with strict signature verification before and after ZIP extraction.
+
 ## [0.4.1] - 2026-09-14
 
 ### Added

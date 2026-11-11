@@ -19,7 +19,7 @@ Stage 5 initially adapts the visual deck to normal local audio. The original vin
 
 ## Candidate donors reviewed
 
-These are candidates, not bundled dependencies. No donor code has been copied in stage 1.
+These are candidates, not bundled applications. Stages 1 and 2 keep the existing renderer and player; stage 2 adds only the MIT-licensed `music-metadata` parser and its dependencies for tag reading.
 
 | Project | License reported by repository | Useful parts | Integration decision |
 | --- | --- | --- | --- |
@@ -50,4 +50,18 @@ Before copying any module, verify the actual license file and file-level notices
 
 The desktop automation does not replace the owner's macOS listening check. Before stage 1 is called release-ready, verify an actual music folder on the Mac, including YT source switching with the updated companion. Do not tag or merge solely because packaging succeeded.
 
-CI produces an unsigned Apple Silicon preview and matching v0.5.0 companion as `YTMamp-stage1-macos-arm64`. These are preview artifacts, not a tagged public release. The first Linux CI pass confirmed actual audio decoding, analyzer output and seeking; the final dependency lock and macOS package are checked again on the final branch revision.
+Stage 1 produced an ad-hoc signed Apple Silicon preview and matching v0.5.0 companion as `YTMamp-stage1-macos-arm64`. The owner installed and confirmed local playback on the Mac. These are preview artifacts, not a tagged public release.
+
+## Stage 2 behavior
+
+- **ADD** accepts multiple folders and adds them to the saved collection. Existing stage 1 settings migrate automatically. Parent/child selections share one track entry; removing either root leaves tracks that are still covered by another root.
+- **LIBRARY** expands to 700 × 560, with tracks, albums, a folder selector and search across title, artist, album, album artist, genre, year and relative filename. Search ignores case and accents and requires all entered words to match. Browsing and searching do not change playback.
+- Embedded tags are read without rewriting files. Missing title/artist/album values use filename, Unknown artist and parent-folder labels. Albums use album artist plus album name, or the physical folder when no album tag exists. Disc and track numbers determine album playback order.
+- **Play album** sets a queue within that album; the last track stops unless repeat or shuffle is enabled. Selecting a track in the full collection restores the full collection queue.
+- Embedded front covers are preferred. If no supported embedded picture exists, the containing folder is checked for `cover.jpg`, `cover.png`, `folder.jpg`, `folder.png`, `front.jpg`, `front.png` or `cover.webp`. JPEG, PNG and WebP pictures up to 2 MiB are accepted. Missing or evicted art uses a placeholder.
+- Only selected roots are rescanned, at startup or **Refresh**. Unchanged files reuse saved tags. Root and metadata updates commit atomically; cancelation leaves the previous collection intact. Adding/refreshing does not reload the playing track while it remains available.
+- Offline roots retain cached metadata and artwork for browsing/search. Their tracks cannot play until the drive returns and **Refresh** succeeds. Removing a root changes the library only; original files are never deleted.
+- Limits: 20 roots, 10,000 unique tracks across the collection, 5,000 tracks/50,000 entries examined per root, 16 MiB manifest and 32 MiB artwork cache. The renderer receives opaque IDs, relative labels and controlled artwork URLs. No audio files are copied.
+- Parsing runs sequentially in one worker with a per-file timeout and memory limits. There is no background whole-machine discovery, tag editor, radio or vinyl engine in this stage.
+
+`npm run test:library:desktop` uses generated tagged WAVs and an isolated profile to check actual metadata, artwork decoding, search, playback continuity while adding roots, album boundaries, reconnect and safe removal. CI also exercises the metadata worker from the signed Mac package's ASAR. The stage 2 artifact is `YTMamp-stage2-macos-arm64`, version 0.6.0. Manual Mac listening and real browser authentication remain separate from these automated checks.

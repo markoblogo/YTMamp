@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { taggedWav } = require('./test-audio-fixture');
+const { taggedWav } = require('./audio-fixture');
 async function run() {
     const appDirectory = process.argv[2];
     const { MetadataReader } = require(path.join(appDirectory, 'Contents/Resources/app.asar/src/main/metadata_reader.js'));

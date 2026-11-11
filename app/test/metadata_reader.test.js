@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { MetadataReader } = require('../src/main/metadata_reader');
 const { LocalCollection } = require('../src/main/local_collection');
-const { PNG, taggedWav } = require('../scripts/test-audio-fixture');
+const { PNG, taggedWav } = require('../scripts/audio-fixture');
 
 test('real metadata worker reads embedded UTF-8 tags, track numbers and front-cover bytes', async (t) => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'ytmamp-tags-'));
@@ -24,6 +24,7 @@ test('real metadata worker reads embedded UTF-8 tags, track numbers and front-co
     await collection.load(); const result = await collection.update({ folders: [directory] });
     assert.equal(result.tracks[0].title, 'Première piste'); assert.ok(result.tracks[0].cover);
     const broken = path.join(directory, 'broken.mp3'); await fs.writeFile(broken, 'bad audio');
-    await assert.rejects(reader.read(broken));
+    assert.equal((await reader.read(broken)).metadata.title, '');
+    await assert.rejects(reader.read(path.join(directory, 'missing.wav')));
     assert.equal((await reader.read(file)).metadata.title, 'Première piste');
 });

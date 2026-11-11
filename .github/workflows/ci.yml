@@ -71,7 +71,7 @@ jobs:
         working-directory: app
         env:
           ELECTRON_RUN_AS_NODE: '1'
-        run: ./dist/mac-arm64/YTMamp.app/Contents/MacOS/YTMamp scripts/test-packaged-metadata.js "$PWD/dist/mac-arm64/YTMamp.app"
+        run: ./dist/mac-arm64/YTMamp.app/Contents/MacOS/YTMamp scripts/smoke-packaged-metadata.js "$PWD/dist/mac-arm64/YTMamp.app"
 
       - name: Bundle matching browser companion
         if: matrix.os == 'macos-latest'
